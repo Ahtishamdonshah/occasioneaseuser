@@ -2,28 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // Import FirebaseAuth
 
-class availability extends StatefulWidget {
+class availabilityfarm extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
   final Map<String, int> quantities;
   final DateTime selectedDate;
   final String selectedTimeSlot;
+  final double pricePerSeat; // Add pricePerSeat to the constructor
 
-  const availability({
+  const availabilityfarm({
     Key? key,
     required this.selectedServices,
     required this.quantities,
     required this.selectedDate,
     required this.selectedTimeSlot,
+    required this.pricePerSeat,
     required List<Map<String, dynamic>> services,
     required DateTime date,
-    required String timeSlot,
+    required String timeSlot, // Receive pricePerSeat
   }) : super(key: key);
 
   @override
-  _availabilityState createState() => _availabilityState();
+  _availabilityfarmState createState() => _availabilityfarmState();
 }
 
-class _availabilityState extends State<availability> {
+class _availabilityfarmState extends State<availabilityfarm> {
   bool _isLoading = true;
   String? _parlorId;
   double _totalPrice = 0.0;
@@ -104,7 +106,7 @@ class _availabilityState extends State<availability> {
     setState(() => _isLoading = false);
   }
 
-  // Calculate total price based on selected services and quantities
+  // Calculate total price based on selected services, quantities, and pricePerSeat
   void _calculateTotalPrice() {
     double total = 0.0;
     for (var service in widget.selectedServices) {
@@ -112,6 +114,10 @@ class _availabilityState extends State<availability> {
       final quantity = widget.quantities[service['name']] ?? 1;
       total += price * quantity;
     }
+    // Add pricePerSeat to the total price calculation
+    total += widget.pricePerSeat *
+        widget.quantities
+            .length; // Example: multiplying by number of rooms selected
     setState(() {
       _totalPrice = total;
     });
@@ -120,7 +126,7 @@ class _availabilityState extends State<availability> {
   // Book Appointment
   Future<void> _bookAppointment() async {
     try {
-      await FirebaseFirestore.instance.collection('Bookings').add({
+      await FirebaseFirestore.instance.collection('Bookingfarm').add({
         'parlorId': _parlorId,
         'userId': _userId, // Using the current user ID
         'services': widget.selectedServices.map((service) {
@@ -159,6 +165,13 @@ class _availabilityState extends State<availability> {
               : Expanded(
                   child: ListView(
                     children: [
+                      // Price Per Seat and Total Cost
+                      const SizedBox(height: 16),
+                      Text(
+                        'Price per Seat: \$${widget.pricePerSeat}',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
                       // Display services, quantities, and total price
                       ...widget.selectedServices.map((service) {
                         final quantity =

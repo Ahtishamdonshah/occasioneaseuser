@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Firebase Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:occasioneaseuser/Screens/quantityanddatefarmhouse.dart';
 
 class farmhouse extends StatelessWidget {
   const farmhouse({Key? key}) : super(key: key);
@@ -11,10 +12,8 @@ class farmhouse extends StatelessWidget {
         title: const Text("Farmhouses"),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection(
-                'Farm Houses') // Fetch data from 'Farmhouses' collection
-            .snapshots(),
+        stream:
+            FirebaseFirestore.instance.collection('Farm Houses').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -26,7 +25,6 @@ class farmhouse extends StatelessWidget {
             return const Center(child: Text('No farmhouses found'));
           }
 
-          // Fetch all documents and pass the document ID with data
           final farmhouses = snapshot.data!.docs;
 
           return ListView.builder(
@@ -34,21 +32,52 @@ class farmhouse extends StatelessWidget {
             itemBuilder: (context, index) {
               final doc = farmhouses[index];
               final data = doc.data() as Map<String, dynamic>;
-              return ListTile(
-                title: Text(data['name'] ?? 'Unnamed Farmhouse'),
-                subtitle: Text(data['location'] ?? 'Location not provided'),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FarmhouseDetailsScreen(
-                        farmhouseId: doc.id,
-                        farmhouseData: data,
-                        userId: data['userId'] ?? 'Unknown User', // Pass userId
+
+              return Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: ListTile(
+                  title: Text(
+                    data['name'] ?? 'Unnamed Farmhouse',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    "Location: ${data['location'] ?? 'Not provided'}",
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios),
+                  onTap: () async {
+                    List<String> timeSlots = [];
+                    try {
+                      final farmhouseDoc = await FirebaseFirestore.instance
+                          .collection('Farm Houses')
+                          .doc(doc.id)
+                          .get();
+
+                      final slots = farmhouseDoc.data()?['timeSlots'] ?? [];
+                      for (var slot in slots) {
+                        String startTime = slot['startTime'] ?? '';
+                        String endTime = slot['endTime'] ?? '';
+                        timeSlots.add('$startTime - $endTime');
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Error fetching time slots')),
+                      );
+                    }
+
+                    // Navigating to the FarmhouseDetailsScreen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => FarmhouseDetailsScreen(
+                          farmhouseId: doc.id,
+                          farmhouseData: data,
+                          timeSlots: timeSlots,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               );
             },
           );
@@ -58,30 +87,43 @@ class farmhouse extends StatelessWidget {
   }
 }
 
-class FarmhouseDetailsScreen extends StatelessWidget {
+class FarmhouseDetailsScreen extends StatefulWidget {
   final String farmhouseId;
   final Map<String, dynamic> farmhouseData;
-  final String userId;
+  final List<String> timeSlots;
 
-  const FarmhouseDetailsScreen(
-      {Key? key,
-      required this.farmhouseId,
-      required this.farmhouseData,
-      required this.userId})
-      : super(key: key);
+  const FarmhouseDetailsScreen({
+    Key? key,
+    required this.farmhouseId,
+    required this.farmhouseData,
+    required this.timeSlots,
+  }) : super(key: key);
+
+  @override
+  _FarmhouseDetailsScreenState createState() => _FarmhouseDetailsScreenState();
+}
+
+class _FarmhouseDetailsScreenState extends State<FarmhouseDetailsScreen> {
+  late List<bool> _selectedServices;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedServices = List.filled(
+        widget.farmhouseData['additionalServices']?.length ?? 0, false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final List<String> images =
-        List<String>.from(farmhouseData['images'] ?? []);
-    final String name = farmhouseData['name'] ?? 'N/A';
-    final String location = farmhouseData['location'] ?? 'N/A';
-    final String serviceType = farmhouseData['serviceType'] ?? 'N/A';
-    final double price = (farmhouseData['price'] ?? 0).toDouble();
-    final String description =
-        farmhouseData['description'] ?? 'No description available';
-    final List<String> selectedServices =
-        List<String>.from(farmhouseData['selectedServices'] ?? []);
+        List<String>.from(widget.farmhouseData['imageUrls'] ?? []);
+    final String name = widget.farmhouseData['name'] ?? 'N/A';
+    final String location = widget.farmhouseData['location'] ?? 'N/A';
+    final double farmhousePrice = widget.farmhouseData['price'] ?? 0;
+    final double pricePerSeat =
+        widget.farmhouseData['pricePerSeat'] ?? 0; // Get pricePerSeat
+    final List<dynamic> additionalServices =
+        widget.farmhouseData['additionalServices'] ?? [];
 
     return Scaffold(
       appBar: AppBar(
@@ -91,10 +133,10 @@ class FarmhouseDetailsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Images Carousel
             if (images.isNotEmpty)
               Container(
                 height: 200,
+                margin: const EdgeInsets.only(bottom: 16),
                 child: PageView(
                   children: images
                       .map(
@@ -109,70 +151,79 @@ class FarmhouseDetailsScreen extends StatelessWidget {
                 ),
               )
             else
-              const Center(child: Text('No images available')),
-
+              const Center(
+                  child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text('No images available'),
+              )),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Farmhouse Name
                   Text(name,
                       style: const TextStyle(
                           fontSize: 24, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-
-                  // Location
                   Text('Location: $location',
                       style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 8),
-
-                  // Service Type
-                  Text('Service Type: $serviceType',
-                      style: const TextStyle(fontSize: 16)),
-                  const SizedBox(height: 8),
-
-                  // Price
-                  Text('Price: \$${price.toStringAsFixed(2)}',
+                  Text(
+                      'Price per Seat: \$${pricePerSeat.toStringAsFixed(2)}', // Display price per seat
                       style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 16),
-
-                  // Description
-                  const Text('Description:',
+                  const Text('Additional Services:',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  Text(description, style: const TextStyle(fontSize: 16)),
+                  ...List.generate(additionalServices.length, (index) {
+                    final service = additionalServices[index];
+                    return CheckboxListTile(
+                      title: Text(service['name'] ?? 'N/A'),
+                      subtitle: Text(
+                          'Price: \$${(service['price'] ?? 0).toStringAsFixed(2)}'),
+                      value: _selectedServices[index],
+                      onChanged: (bool? value) {
+                        setState(() {
+                          _selectedServices[index] = value ?? false;
+                        });
+                      },
+                    );
+                  }),
                   const SizedBox(height: 16),
-
-                  // Services
-                  const Text('Services:',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  if (selectedServices.isNotEmpty)
-                    ...selectedServices.map((service) => Text('• $service',
-                        style: const TextStyle(fontSize: 16)))
-                  else
-                    const Text('No specific services listed.',
-                        style: TextStyle(fontSize: 16)),
-                  const SizedBox(height: 16),
-
-                  // User ID
-                  const Text('User ID:',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(userId, style: const TextStyle(fontSize: 16)),
-                  const SizedBox(height: 16),
-
-                  // Book Now Button
                   Center(
                     child: ElevatedButton(
                       onPressed: () {
-                        // Implement booking functionality
+                        final selectedServices = <Map<String, dynamic>>[];
+
+                        // Collect selected services
+                        for (int i = 0; i < _selectedServices.length; i++) {
+                          if (_selectedServices[i]) {
+                            selectedServices.add(additionalServices[i]);
+                          }
+                        }
+
+                        // Navigating to Quantity and Date Screen
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                quantityanddateFarmhouseScreen(
+                              selectedRooms:
+                                  selectedServices, // Assuming 'selectedServices' is the equivalent of selected rooms
+                              farmhouseId: widget.farmhouseId,
+                              timeSlots: widget.timeSlots,
+                              roomPrices: [
+                                farmhousePrice
+                              ], // Wrap the farmhousePrice in a list
+                              farmhousePrice: farmhousePrice,
+                              selectedServices: selectedServices,
+                              pricePerSeat: pricePerSeat, // Pass pricePerSeat
+                            ),
+                          ),
+                        );
                       },
-                      child: const Text('Book Now'),
+                      child: const Text('Proceed to Booking'),
                     ),
                   ),
                 ],

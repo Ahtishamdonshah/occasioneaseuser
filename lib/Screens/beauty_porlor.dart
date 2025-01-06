@@ -41,13 +41,38 @@ class beauty_porlor extends StatelessWidget {
                   ),
                   subtitle: Text(data['location'] ?? 'Location not provided'),
                   trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () {
+                  onTap: () async {
+                    // Fetching the time slots before navigation
+                    List<String> timeSlots = [];
+                    try {
+                      final parlorDoc = await FirebaseFirestore.instance
+                          .collection('Beauty Parlors')
+                          .doc(doc.id)
+                          .get();
+
+                      // Extracting time slots in the format: "startTime - endTime"
+                      final slots = parlorDoc.data()?['timeSlots'] ?? [];
+                      for (var slot in slots) {
+                        String startTime = slot['startTime'] ?? '';
+                        String endTime = slot['endTime'] ?? '';
+                        timeSlots.add('$startTime - $endTime');
+                      }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Error fetching time slots')),
+                      );
+                    }
+
+                    // Navigating to the ParlorDetailsScreen with all necessary data
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => ParlorDetailsScreen(
                           parlorId: doc.id,
                           parlorData: data,
+                          timeSlots:
+                              timeSlots, // Passing the formatted timeSlots here
                         ),
                       ),
                     );
@@ -65,11 +90,13 @@ class beauty_porlor extends StatelessWidget {
 class ParlorDetailsScreen extends StatefulWidget {
   final String parlorId;
   final Map<String, dynamic> parlorData;
+  final List<String> timeSlots;
 
   const ParlorDetailsScreen({
     Key? key,
     required this.parlorId,
     required this.parlorData,
+    required this.timeSlots, // Receiving timeSlots here
   }) : super(key: key);
 
   @override
@@ -110,7 +137,6 @@ class _ParlorDetailsScreenState extends State<ParlorDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Images Carousel
             if (images.isNotEmpty)
               Container(
                 height: 200,
@@ -134,24 +160,18 @@ class _ParlorDetailsScreenState extends State<ParlorDetailsScreen> {
                 padding: EdgeInsets.all(16.0),
                 child: Text('No images available'),
               )),
-
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Parlor Name
                   Text(name,
                       style: const TextStyle(
                           fontSize: 24, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-
-                  // Location
                   Text('Location: $location',
                       style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 16),
-
-                  // Services by Category
                   const Text('Services:',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -184,8 +204,6 @@ class _ParlorDetailsScreenState extends State<ParlorDetailsScreen> {
                     );
                   }),
                   const SizedBox(height: 16),
-
-                  // Add Services Button
                   Center(
                     child: ElevatedButton(
                       onPressed: () {
@@ -215,6 +233,7 @@ class _ParlorDetailsScreenState extends State<ParlorDetailsScreen> {
                             builder: (context) => quantityanddate(
                               selectedSubservices: selectedServices,
                               parlorId: widget.parlorId,
+                              timeSlots: widget.timeSlots, // Passing timeSlots
                             ),
                           ),
                         );

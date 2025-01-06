@@ -1,26 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:occasioneaseuser/Screens/availability.dart';
-// Import AvailabilityPage
+import 'package:occasioneaseuser/Screens/availabilityfarm.dart'; // Import AvailabilityPage
 
-class quantityanddate extends StatefulWidget {
-  final List<Map<String, dynamic>> selectedSubservices;
-  final String parlorId;
+class quantityanddateFarmhouseScreen extends StatefulWidget {
+  final List<Map<String, dynamic>> selectedRooms;
+  final String farmhouseId;
   final List<String> timeSlots;
+  final List<double> roomPrices;
+  final double pricePerSeat; // Add this field to the constructor
 
-  const quantityanddate({
+  const quantityanddateFarmhouseScreen({
     Key? key,
-    required this.selectedSubservices,
-    required this.parlorId,
+    required this.selectedRooms,
+    required this.farmhouseId,
     required this.timeSlots,
+    required this.roomPrices,
+    required this.pricePerSeat,
+    required double farmhousePrice,
+    required List<Map<String, dynamic>>
+        selectedServices, // Pass the pricePerSeat here
   }) : super(key: key);
 
   @override
-  _quantityanddateState createState() => _quantityanddateState();
+  _quantityanddateFarmhouseScreenState createState() =>
+      _quantityanddateFarmhouseScreenState();
 }
 
-class _quantityanddateState extends State<quantityanddate> {
+class _quantityanddateFarmhouseScreenState
+    extends State<quantityanddateFarmhouseScreen> {
   final Map<String, int> _quantities = {};
   DateTime? _selectedDate;
   String? _selectedTimeSlot;
@@ -28,8 +36,8 @@ class _quantityanddateState extends State<quantityanddate> {
   @override
   void initState() {
     super.initState();
-    for (var service in widget.selectedSubservices) {
-      _quantities[service['name']] = 1;
+    for (var room in widget.selectedRooms) {
+      _quantities[room['name']] = 1;
     }
   }
 
@@ -49,7 +57,7 @@ class _quantityanddateState extends State<quantityanddate> {
     }
   }
 
-  Future<void> _bookAppointment() async {
+  Future<void> _bookFarmhouse() async {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -61,15 +69,15 @@ class _quantityanddateState extends State<quantityanddate> {
 
     try {
       // Add the booking details to Firestore
-      await FirebaseFirestore.instance.collection('Bookings').add({
-        'parlorId': widget.parlorId,
+      await FirebaseFirestore.instance.collection('FarmhouseBookings').add({
+        'farmhouseId': widget.farmhouseId,
         'date': DateFormat('yyyy-MM-dd').format(_selectedDate!),
         'timeSlot': _selectedTimeSlot,
-        'services': widget.selectedSubservices
-            .map((service) => {
-                  'name': service['name'],
-                  'quantity': _quantities[service['name']],
-                  'price': service['price']
+        'rooms': widget.selectedRooms
+            .map((room) => {
+                  'name': room['name'],
+                  'quantity': _quantities[room['name']],
+                  'price': room['price']
                 })
             .toList(),
         'status': 'Pending',
@@ -78,8 +86,8 @@ class _quantityanddateState extends State<quantityanddate> {
       // Update the time slot as booked
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
       final timeSlotDoc = await FirebaseFirestore.instance
-          .collection('Beauty Parlors')
-          .doc(widget.parlorId)
+          .collection('Farmhouses')
+          .doc(widget.farmhouseId)
           .collection('timeSlots')
           .where('date', isEqualTo: dateStr)
           .where('startTime', isEqualTo: _selectedTimeSlot!.split(' - ')[0])
@@ -93,23 +101,23 @@ class _quantityanddateState extends State<quantityanddate> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => availability(
-            selectedServices:
-                widget.selectedSubservices, // List of selected services
-            quantities: _quantities, // Map of service name to quantity
+          builder: (context) => availabilityfarm(
+            selectedServices: widget.selectedRooms, // List of selected rooms
+            quantities: _quantities, // Map of room name to quantity
             selectedDate: _selectedDate!, // Selected date
             selectedTimeSlot: _selectedTimeSlot!, // Selected time slot
-            services: widget.selectedSubservices, // Same services as before
+            services: widget.selectedRooms, // Same rooms as before
             date: _selectedDate!, // Same date as before
             timeSlot: _selectedTimeSlot!, // Selected time slot
+            pricePerSeat: widget.pricePerSeat, // Pass pricePerSeat here
           ),
         ),
       );
     } catch (e) {
-      print('Error booking appointment: $e');
+      print('Error booking farmhouse: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Failed to book appointment'),
+          content: Text('Failed to book farmhouse'),
         ),
       );
     }
@@ -119,7 +127,7 @@ class _quantityanddateState extends State<quantityanddate> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Booking Details"),
+        title: const Text("Farmhouse Booking Details"),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -127,12 +135,19 @@ class _quantityanddateState extends State<quantityanddate> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Price Per Seat and Total Cost
+              const SizedBox(height: 16),
+              Text(
+                'Price per Seat: \$${widget.pricePerSeat}',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               const Text(
-                'Selected Services:',
+                'Selected Rooms: ',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              ...widget.selectedSubservices.map((service) {
+              ...widget.selectedRooms.map((room) {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Padding(
@@ -141,7 +156,7 @@ class _quantityanddateState extends State<quantityanddate> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          service['name'],
+                          room['name'],
                           style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.bold),
                         ),
@@ -149,27 +164,27 @@ class _quantityanddateState extends State<quantityanddate> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Price: \$${service['price']}'),
+                            Text('Price: \$${room['price']}'),
                             Row(
                               children: [
                                 IconButton(
                                   icon: const Icon(Icons.remove),
                                   onPressed: () {
                                     setState(() {
-                                      if (_quantities[service['name']]! > 1) {
-                                        _quantities[service['name']] =
-                                            _quantities[service['name']]! - 1;
+                                      if (_quantities[room['name']]! > 1) {
+                                        _quantities[room['name']] =
+                                            _quantities[room['name']]! - 1;
                                       }
                                     });
                                   },
                                 ),
-                                Text('${_quantities[service['name']]}'),
+                                Text('${_quantities[room['name']]}'),
                                 IconButton(
                                   icon: const Icon(Icons.add),
                                   onPressed: () {
                                     setState(() {
-                                      _quantities[service['name']] =
-                                          _quantities[service['name']]! + 1;
+                                      _quantities[room['name']] =
+                                          _quantities[room['name']]! + 1;
                                     });
                                   },
                                 ),
@@ -186,7 +201,7 @@ class _quantityanddateState extends State<quantityanddate> {
 
               // Date Selection
               const Text(
-                'Select Date:',
+                'Select Date: ',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -207,7 +222,7 @@ class _quantityanddateState extends State<quantityanddate> {
               // Time Slot Selection
               if (_selectedDate != null) ...[
                 const Text(
-                  'Select Time Slot:',
+                  'Select Time Slot: ',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -229,9 +244,10 @@ class _quantityanddateState extends State<quantityanddate> {
               const SizedBox(height: 16),
 
               // Submit Button
+              const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
-                  onPressed: _bookAppointment,
+                  onPressed: _bookFarmhouse,
                   child: const Text('Book Now'),
                 ),
               ),
