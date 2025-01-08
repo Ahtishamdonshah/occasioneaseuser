@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:occasioneaseuser/Screens/availabilityfarm.dart'; // Import AvailabilityPage
+import 'package:occasioneaseuser/Screens/availabilityfarm.dart';
+// Import AvailabilityPage
 
 class quantityanddateFarmhouseScreen extends StatefulWidget {
   final List<Map<String, dynamic>> selectedRooms;
@@ -106,10 +107,13 @@ class _quantityanddateFarmhouseScreenState
             quantities: _quantities, // Map of room name to quantity
             selectedDate: _selectedDate!, // Selected date
             selectedTimeSlot: _selectedTimeSlot!, // Selected time slot
-            services: widget.selectedRooms, // Same rooms as before
-            date: _selectedDate!, // Same date as before
+            // services: widget.selectedRooms, // Same rooms as before
+            // date: _selectedDate!, // Same date as before
             timeSlot: _selectedTimeSlot!, // Selected time slot
             pricePerSeat: widget.pricePerSeat, // Pass pricePerSeat here
+            farmId: widget.farmhouseId, // Add the required farmId parameter
+            marriageHallId:
+                widget.farmhouseId, // Add the required marriageHallId parameter
           ),
         ),
       );

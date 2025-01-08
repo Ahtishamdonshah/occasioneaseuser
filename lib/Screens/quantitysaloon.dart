@@ -1,26 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:occasioneaseuser/Screens/availability.dart';
-// Import AvailabilityPage
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:occasioneaseuser/Screens/availabilitysaloon.dart';
 
-class quantityanddate extends StatefulWidget {
-  final List<Map<String, dynamic>> selectedSubservices;
-  final String parlorId;
+class QuantityAndDateSaloon extends StatefulWidget {
+  final List<Map<String, dynamic>> selectedServices;
+  final String saloonId;
   final List<String> timeSlots;
 
-  const quantityanddate({
+  const QuantityAndDateSaloon({
     Key? key,
-    required this.selectedSubservices,
-    required this.parlorId,
+    required this.selectedServices,
+    required this.saloonId,
     required this.timeSlots,
   }) : super(key: key);
 
   @override
-  _quantityanddateState createState() => _quantityanddateState();
+  _QuantityAndDateSaloonState createState() => _QuantityAndDateSaloonState();
 }
 
-class _quantityanddateState extends State<quantityanddate> {
+class _QuantityAndDateSaloonState extends State<QuantityAndDateSaloon> {
   final Map<String, int> _quantities = {};
   DateTime? _selectedDate;
   String? _selectedTimeSlot;
@@ -28,7 +27,8 @@ class _quantityanddateState extends State<quantityanddate> {
   @override
   void initState() {
     super.initState();
-    for (var service in widget.selectedSubservices) {
+    // Initialize quantities for selected services
+    for (var service in widget.selectedServices) {
       _quantities[service['name']] = 1;
     }
   }
@@ -49,7 +49,7 @@ class _quantityanddateState extends State<quantityanddate> {
     }
   }
 
-  Future<void> _bookAppointment() async {
+  Future<void> _navigateToAvailabilitySaloon() async {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -60,57 +60,33 @@ class _quantityanddateState extends State<quantityanddate> {
     }
 
     try {
-      // Add the booking details to Firestore
-      await FirebaseFirestore.instance.collection('Bookings').add({
-        'parlorId': widget.parlorId,
-        'date': DateFormat('yyyy-MM-dd').format(_selectedDate!),
-        'timeSlot': _selectedTimeSlot,
-        'services': widget.selectedSubservices
-            .map((service) => {
-                  'name': service['name'],
-                  'quantity': _quantities[service['name']],
-                  'price': service['price']
-                })
-            .toList(),
-        'status': 'Pending',
-      });
-
-      // Update the time slot as booked
-      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
-      final timeSlotDoc = await FirebaseFirestore.instance
-          .collection('Beauty Parlors')
-          .doc(widget.parlorId)
-          .collection('timeSlots')
-          .where('date', isEqualTo: dateStr)
-          .where('startTime', isEqualTo: _selectedTimeSlot!.split(' - ')[0])
-          .get();
-
-      if (timeSlotDoc.docs.isNotEmpty) {
-        await timeSlotDoc.docs.first.reference.update({'isBooked': true});
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not logged in')),
+        );
+        return;
       }
 
-      // Navigate to the AvailabilityPage with selected data
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => availability(
-            selectedServices:
-                widget.selectedSubservices, // List of selected services
-            quantities: _quantities, // Map of service name to quantity
-            selectedDate: _selectedDate!, // Selected date
-            selectedTimeSlot: _selectedTimeSlot!, // Selected time slot
-            beautyParlorId:
-                widget.parlorId, // Add the required beautyParlorId argument
-            timeSlot: _selectedTimeSlot!, // Selected time slot
+          builder: (context) => AvailabilitySaloon(
+            saloonId: widget.saloonId,
+            selectedServices: widget.selectedServices,
+            quantities: _quantities,
+            selectedDate: _selectedDate!,
+            selectedTimeSlot: _selectedTimeSlot!,
+            userId: user.uid,
+            timeSlots: widget.timeSlots,
           ),
         ),
       );
     } catch (e) {
-      print('Error booking appointment: $e');
+      print('Error navigating to availability saloon: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Failed to book appointment'),
-        ),
+            content: Text('Failed to navigate to availability saloon')),
       );
     }
   }
@@ -119,7 +95,7 @@ class _quantityanddateState extends State<quantityanddate> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Booking Details"),
+        title: const Text("Saloon Quantity Selection"),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -132,7 +108,7 @@ class _quantityanddateState extends State<quantityanddate> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              ...widget.selectedSubservices.map((service) {
+              ...widget.selectedServices.map((service) {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Padding(
@@ -181,10 +157,8 @@ class _quantityanddateState extends State<quantityanddate> {
                     ),
                   ),
                 );
-              }),
+              }).toList(),
               const SizedBox(height: 16),
-
-              // Date Selection
               const Text(
                 'Select Date:',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -203,8 +177,6 @@ class _quantityanddateState extends State<quantityanddate> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // Time Slot Selection
               if (_selectedDate != null) ...[
                 const Text(
                   'Select Time Slot:',
@@ -227,11 +199,9 @@ class _quantityanddateState extends State<quantityanddate> {
                 ),
               ],
               const SizedBox(height: 16),
-
-              // Submit Button
               Center(
                 child: ElevatedButton(
-                  onPressed: _bookAppointment,
+                  onPressed: _navigateToAvailabilitySaloon,
                   child: const Text('Book Now'),
                 ),
               ),

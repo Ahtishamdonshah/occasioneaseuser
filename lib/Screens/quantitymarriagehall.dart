@@ -1,26 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:occasioneaseuser/Screens/availability.dart';
-// Import AvailabilityPage
+import 'package:occasioneaseuser/Screens/availabilityfarm.dart';
 
-class quantityanddate extends StatefulWidget {
-  final List<Map<String, dynamic>> selectedSubservices;
-  final String parlorId;
+class QuantityAndDateMarriageHallScreen extends StatefulWidget {
+  final List<Map<String, dynamic>> selectedServices;
+  final String marriageHallId;
   final List<String> timeSlots;
+  final double pricePerSeat;
 
-  const quantityanddate({
+  const QuantityAndDateMarriageHallScreen({
     Key? key,
-    required this.selectedSubservices,
-    required this.parlorId,
+    required this.selectedServices,
+    required this.marriageHallId,
     required this.timeSlots,
+    required this.pricePerSeat,
+    required String hallId,
+    required Map<String, dynamic> hallData,
+    required DateTime selectedDate,
+    required String selectedTimeSlot,
   }) : super(key: key);
 
   @override
-  _quantityanddateState createState() => _quantityanddateState();
+  _QuantityAndDateMarriageHallScreenState createState() =>
+      _QuantityAndDateMarriageHallScreenState();
 }
 
-class _quantityanddateState extends State<quantityanddate> {
+class _QuantityAndDateMarriageHallScreenState
+    extends State<QuantityAndDateMarriageHallScreen> {
   final Map<String, int> _quantities = {};
   DateTime? _selectedDate;
   String? _selectedTimeSlot;
@@ -28,7 +35,7 @@ class _quantityanddateState extends State<quantityanddate> {
   @override
   void initState() {
     super.initState();
-    for (var service in widget.selectedSubservices) {
+    for (var service in widget.selectedServices) {
       _quantities[service['name']] = 1;
     }
   }
@@ -49,7 +56,7 @@ class _quantityanddateState extends State<quantityanddate> {
     }
   }
 
-  Future<void> _bookAppointment() async {
+  Future<void> _bookMarriageHall() async {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -60,12 +67,12 @@ class _quantityanddateState extends State<quantityanddate> {
     }
 
     try {
-      // Add the booking details to Firestore
-      await FirebaseFirestore.instance.collection('Bookings').add({
-        'parlorId': widget.parlorId,
+      // Add booking details to Firestore
+      await FirebaseFirestore.instance.collection('MarriageHallBookings').add({
+        'marriageHallId': widget.marriageHallId,
         'date': DateFormat('yyyy-MM-dd').format(_selectedDate!),
         'timeSlot': _selectedTimeSlot,
-        'services': widget.selectedSubservices
+        'services': widget.selectedServices
             .map((service) => {
                   'name': service['name'],
                   'quantity': _quantities[service['name']],
@@ -75,11 +82,11 @@ class _quantityanddateState extends State<quantityanddate> {
         'status': 'Pending',
       });
 
-      // Update the time slot as booked
+      // Update time slot as booked
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
       final timeSlotDoc = await FirebaseFirestore.instance
-          .collection('Beauty Parlors')
-          .doc(widget.parlorId)
+          .collection('MarriageHalls')
+          .doc(widget.marriageHallId)
           .collection('timeSlots')
           .where('date', isEqualTo: dateStr)
           .where('startTime', isEqualTo: _selectedTimeSlot!.split(' - ')[0])
@@ -93,23 +100,24 @@ class _quantityanddateState extends State<quantityanddate> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => availability(
-            selectedServices:
-                widget.selectedSubservices, // List of selected services
-            quantities: _quantities, // Map of service name to quantity
-            selectedDate: _selectedDate!, // Selected date
-            selectedTimeSlot: _selectedTimeSlot!, // Selected time slot
-            beautyParlorId:
-                widget.parlorId, // Add the required beautyParlorId argument
-            timeSlot: _selectedTimeSlot!, // Selected time slot
+          builder: (context) => availabilityfarm(
+            selectedServices: widget.selectedServices,
+            quantities: _quantities,
+            selectedDate: _selectedDate!,
+            selectedTimeSlot: _selectedTimeSlot!,
+            pricePerSeat: widget.pricePerSeat,
+            marriageHallId: widget.marriageHallId,
+            farmId: widget
+                .marriageHallId, // Assuming farmId is the same as marriageHallId
+            timeSlot: _selectedTimeSlot!,
           ),
         ),
       );
     } catch (e) {
-      print('Error booking appointment: $e');
+      print('Error booking marriage hall: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Failed to book appointment'),
+          content: Text('Failed to book marriage hall'),
         ),
       );
     }
@@ -119,7 +127,7 @@ class _quantityanddateState extends State<quantityanddate> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Booking Details"),
+        title: const Text("Marriage Hall Booking Details"),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -127,12 +135,21 @@ class _quantityanddateState extends State<quantityanddate> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Price Per Seat
+              Text(
+                'Price per Seat: \$${widget.pricePerSeat.toStringAsFixed(2)}',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+
+              // Selected Services
               const Text(
                 'Selected Services:',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              ...widget.selectedSubservices.map((service) {
+              ...widget.selectedServices.map((service) {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Padding(
@@ -182,6 +199,7 @@ class _quantityanddateState extends State<quantityanddate> {
                   ),
                 );
               }),
+
               const SizedBox(height: 16),
 
               // Date Selection
@@ -190,17 +208,11 @@ class _quantityanddateState extends State<quantityanddate> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _selectDate,
-                      child: Text(_selectedDate == null
-                          ? 'Choose Date'
-                          : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
-                    ),
-                  ),
-                ],
+              ElevatedButton(
+                onPressed: _selectDate,
+                child: Text(_selectedDate == null
+                    ? 'Choose Date'
+                    : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
               ),
               const SizedBox(height: 16),
 
@@ -231,7 +243,7 @@ class _quantityanddateState extends State<quantityanddate> {
               // Submit Button
               Center(
                 child: ElevatedButton(
-                  onPressed: _bookAppointment,
+                  onPressed: _bookMarriageHall,
                   child: const Text('Book Now'),
                 ),
               ),

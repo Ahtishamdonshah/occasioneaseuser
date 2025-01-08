@@ -3,11 +3,13 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:occasioneaseuser/Screens/beauty_porlor.dart';
 import 'package:occasioneaseuser/Screens/catering.dart';
+import 'package:occasioneaseuser/Screens/customscreen.dart';
 import 'package:occasioneaseuser/Screens/farmhouse.dart';
 import 'package:occasioneaseuser/Screens/marriage_hall.dart';
 import 'package:occasioneaseuser/Screens/photographer.dart';
 import 'package:occasioneaseuser/Screens/saloon.dart';
 import 'package:occasioneaseuser/Screens/weather.dart';
+// Import the custom screen
 
 class home_screem extends StatefulWidget {
   const home_screem({Key? key}) : super(key: key);
@@ -29,6 +31,7 @@ class _home_screemState extends State<home_screem> {
     {'name': 'Weather', 'imageUrl': 'assets/images/weather.jpg'},
     {'name': 'Marriage Hall', 'imageUrl': 'assets/images/banquet.jpg'},
     {'name': 'Saloon', 'imageUrl': 'assets/images/saloon.png'},
+    {'name': 'Custom', 'imageUrl': 'assets/images/custom.png'}, // New category
   ];
 
   List<dynamic> topDeals = [];
@@ -79,7 +82,7 @@ class _home_screemState extends State<home_screem> {
           screen = const catering();
           break;
         case 'Marriage Hall':
-          screen = const marriage_hall();
+          screen = const MarriageHall();
           break;
         case 'FarmHouse':
           screen = const farmhouse();
@@ -88,7 +91,10 @@ class _home_screemState extends State<home_screem> {
           screen = const photographer();
           break;
         case 'Saloon':
-          screen = const saloon();
+          screen = const Saloon();
+          break;
+        case 'Custom': // Handle navigation to CustomScreen
+          screen = const ComboDealsSelector();
           break;
         default:
           throw Exception("Unknown category: $categoryName");
@@ -306,13 +312,12 @@ class _home_screemState extends State<home_screem> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: topDeals.length,
       itemBuilder: (context, index) {
-        final deal = topDeals[index] as Map<String, dynamic>;
+        final deal = topDeals[index];
         return Card(
-          margin: const EdgeInsets.symmetric(vertical: 8),
           child: ListTile(
             leading: const Icon(Icons.local_offer),
-            title: Text(deal['title'] ?? 'Deal'),
-            subtitle: Text(deal['description'] ?? 'Description unavailable'),
+            title: Text(deal['title'] ?? 'No title'),
+            subtitle: Text(deal['description'] ?? 'No description'),
           ),
         );
       },

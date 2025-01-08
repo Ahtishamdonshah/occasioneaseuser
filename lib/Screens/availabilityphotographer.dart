@@ -1,35 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
-class availabilityfarm extends StatefulWidget {
+class AvailabilityPhotography extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
   final Map<String, int> quantities;
   final DateTime selectedDate;
   final String selectedTimeSlot;
-  final String farmId;
-  final double pricePerSeat;
+  final String userId;
+  final String photographerId;
 
-  const availabilityfarm({
+  const AvailabilityPhotography({
     Key? key,
     required this.selectedServices,
     required this.quantities,
     required this.selectedDate,
     required this.selectedTimeSlot,
-    required this.farmId,
-    required this.pricePerSeat,
-    required String timeSlot,
-    required String marriageHallId,
+    required this.userId,
+    required this.photographerId,
   }) : super(key: key);
 
   @override
-  _availabilityfarmState createState() => _availabilityfarmState();
+  _AvailabilityPhotographyState createState() =>
+      _AvailabilityPhotographyState();
 }
 
-class _availabilityfarmState extends State<availabilityfarm> {
+class _AvailabilityPhotographyState extends State<AvailabilityPhotography> {
   double _totalPrice = 0.0;
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -37,36 +34,21 @@ class _availabilityfarmState extends State<availabilityfarm> {
     _calculateTotalPrice();
   }
 
-  // Calculate total price based on selected services, quantities, and pricePerSeat
   void _calculateTotalPrice() {
     double total = 0.0;
     for (var service in widget.selectedServices) {
-      final price = service['price'] ?? 0.0;
-      final quantity = widget.quantities[service['name']] ?? 1;
-      total += price * quantity;
+      total += service['price'] * (widget.quantities[service['name']] ?? 0);
     }
-    // Add pricePerSeat to the total price calculation
-    total += widget.pricePerSeat; // Simply add pricePerSeat
     setState(() {
       _totalPrice = total;
     });
   }
 
-  Future<void> _bookFarmService() async {
-    setState(() => _isLoading = true);
+  Future<void> _bookPhotographyService() async {
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not logged in')),
-        );
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      await FirebaseFirestore.instance.collection('FarmBookings').add({
-        'userId': user.uid,
-        'farmId': widget.farmId,
+      await FirebaseFirestore.instance.collection('PhotographerBookings').add({
+        'userId': widget.userId,
+        'photographerId': widget.photographerId,
         'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
         'timeSlot': widget.selectedTimeSlot,
         'services': widget.selectedServices
@@ -81,17 +63,16 @@ class _availabilityfarmState extends State<availabilityfarm> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Farm Service Booked Successfully')),
+        const SnackBar(
+            content: Text('Photography Service Booked Successfully')),
       );
 
       // Navigate back or to another page if needed
     } catch (e) {
-      print('Error booking farm service: $e');
+      print('Error booking photography service: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to book farm service')),
+        const SnackBar(content: Text('Failed to book photography service')),
       );
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
@@ -99,7 +80,7 @@ class _availabilityfarmState extends State<availabilityfarm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Check Farm Availability"),
+        title: const Text("Check Photography Availability"),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -108,7 +89,7 @@ class _availabilityfarmState extends State<availabilityfarm> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Selected Farm Services:',
+                'Selected Photography Services:',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -157,10 +138,8 @@ class _availabilityfarmState extends State<availabilityfarm> {
               const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
-                  onPressed: _isLoading ? null : _bookFarmService,
-                  child: _isLoading
-                      ? const CircularProgressIndicator()
-                      : const Text('Book Farm Service'),
+                  onPressed: _bookPhotographyService,
+                  child: const Text('Book Photography Service'),
                 ),
               ),
             ],
