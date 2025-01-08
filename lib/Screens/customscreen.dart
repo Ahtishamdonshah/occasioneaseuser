@@ -11,20 +11,20 @@ class ComboDealsSelector extends StatefulWidget {
 class _ComboDealsSelectorState extends State<ComboDealsSelector> {
   final TextEditingController _budgetController = TextEditingController();
   final List<String> _services = [
-    'Catering',
+    'Marriage Halls',
     'Photographer',
-    'Marriage Hall',
-    'Beauty Parlor',
-    'Salon',
-    'Farmhouse'
+    'Saloons',
+    'Farm Houses',
+    'Catering',
+    'Beauty Parlors'
   ];
   final List<String> _selectedServices = [];
-  Map<String, dynamic> _comboDeal = {};
+  List<Map<String, dynamic>> _comboDeal = [];
   bool _isLoading = false;
 
   Future<void> _fetchComboDeals() async {
-    final int? budget = int.tryParse(_budgetController.text);
-    if (budget == null || budget <= 0 || _selectedServices.isEmpty) {
+    final int? totalBudget = int.tryParse(_budgetController.text);
+    if (totalBudget == null || totalBudget <= 0 || _selectedServices.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
             content: Text(
@@ -38,47 +38,56 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
     });
 
     try {
-      // Query Firebase for the selected services
-      Map<String, dynamic> fetchedServices = {};
-      int remainingBudget = budget;
+      List<Map<String, dynamic>> fetchedVendors = [];
+      int remainingBudget = totalBudget;
+      int budgetPerService = totalBudget ~/ _selectedServices.length;
 
       for (String service in _selectedServices) {
+        // Query for vendors with prices close to the allocated budget
         final QuerySnapshot snapshot = await FirebaseFirestore.instance
             .collection(service)
             .orderBy('price')
-            .get();
+            .startAt([budgetPerService * 0.8]).endAt(
+                [budgetPerService * 1.2]).get();
 
         if (snapshot.docs.isNotEmpty) {
-          for (var doc in snapshot.docs) {
-            final price = doc['price'];
-            if (price <= remainingBudget) {
-              fetchedServices[service] = {
-                'name': doc['name'],
-                'price': price,
-                'details': doc['details'],
-              };
-              remainingBudget -= (price as int);
-              break;
-            }
+          // Find the vendor with the closest price to budgetPerService
+          var closestVendor = snapshot.docs.reduce((a, b) {
+            int priceA = a['price'] as int;
+            int priceB = b['price'] as int;
+            return (priceA - budgetPerService).abs() <
+                    (priceB - budgetPerService).abs()
+                ? a
+                : b;
+          });
+
+          final price = closestVendor['price'] as int;
+          if (price <= remainingBudget) {
+            fetchedVendors.add({
+              'service': service,
+              'name': closestVendor['name'],
+              'price': price,
+              'details': closestVendor['details'],
+            });
+            remainingBudget -= price;
           }
         }
       }
 
-      // If not all services fit within the budget, notify the user
-      if (fetchedServices.length < _selectedServices.length) {
+      setState(() {
+        _comboDeal = fetchedVendors;
+      });
+
+      if (_comboDeal.length < _selectedServices.length) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text(
                   'Some services could not be added due to budget constraints')),
         );
       }
-
-      setState(() {
-        _comboDeal = fetchedServices;
-      });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to fetch combo deals')),
+        SnackBar(content: Text('Failed to fetch combo deals: ${e.toString()}')),
       );
     } finally {
       setState(() {
@@ -98,7 +107,6 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Enter Budget
             const Text(
               'Enter Your Total Budget:',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -109,14 +117,12 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
-                hintText: 'Enter budget (e.g., 10000)',
+                hintText: 'Enter budget (e.g., 100000)',
               ),
             ),
             const SizedBox(height: 16),
-
-            // Select Services
             const Text(
-              'Select Services:',
+              'Select Services (choose one or more):',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -138,8 +144,6 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
               }).toList(),
             ),
             const SizedBox(height: 16),
-
-            // Fetch Combo Deals Button
             Center(
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _fetchComboDeals,
@@ -151,8 +155,6 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Display Combo Deals
             if (_comboDeal.isNotEmpty)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,17 +164,32 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  ..._comboDeal.entries.map((entry) {
+                  ..._comboDeal.map((vendor) {
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 8),
                       child: ListTile(
-                        title: Text('${entry.key}: ${entry.value['name']}'),
+                        title: Text('${vendor['service']}: ${vendor['name']}'),
                         subtitle: Text(
-                          'Price: \$${entry.value['price']}\nDetails: ${entry.value['details']}',
+                          'Price: \$${vendor['price']}\nDetails: ${vendor['details']}',
                         ),
                       ),
                     );
                   }).toList(),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Total Price: \$${_comboDeal.fold(0, (sum, vendor) => sum + vendor['price'] as int)}',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  if (_comboDeal.length < _selectedServices.length)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Text(
+                        'Note: Some services could not be added due to budget constraints.',
+                        style: TextStyle(
+                            color: Colors.red, fontWeight: FontWeight.bold),
+                      ),
+                    ),
                 ],
               ),
           ],
