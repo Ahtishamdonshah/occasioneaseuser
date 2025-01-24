@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:occasioneaseuser/Screens/beauty_porlor.dart';
 import 'package:occasioneaseuser/Screens/catering.dart';
 import 'package:occasioneaseuser/Screens/customscreen.dart';
@@ -8,8 +10,9 @@ import 'package:occasioneaseuser/Screens/farmhouse.dart';
 import 'package:occasioneaseuser/Screens/marriage_hall.dart';
 import 'package:occasioneaseuser/Screens/photographer.dart';
 import 'package:occasioneaseuser/Screens/saloon.dart';
+import 'package:occasioneaseuser/Screens/search.dart';
 import 'package:occasioneaseuser/Screens/weather.dart';
-// Import the custom screen
+// Import the search screen
 
 class home_screem extends StatefulWidget {
   const home_screem({Key? key}) : super(key: key);
@@ -21,8 +24,10 @@ class home_screem extends StatefulWidget {
 class _home_screemState extends State<home_screem> {
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   String selectedService = "Asian";
+  String? userName;
   List<Map<String, String>> categories = [
     {'name': 'Beauty Parlor', 'imageUrl': 'assets/images/beautyparlour.jpg'},
     {'name': 'Catering', 'imageUrl': 'assets/images/catering.jpg'},
@@ -35,12 +40,16 @@ class _home_screemState extends State<home_screem> {
   ];
 
   List<dynamic> topDeals = [];
+  List<String> sliderImages = [];
   bool isLoadingDeals = false;
+  List<Map<String, dynamic>> searchResults = [];
 
   @override
   void initState() {
     super.initState();
     _fetchTopDeals();
+    _fetchUserName();
+    _fetchSliderImages();
   }
 
   Future<void> _fetchTopDeals() async {
@@ -59,6 +68,47 @@ class _home_screemState extends State<home_screem> {
       setState(() {
         isLoadingDeals = false;
       });
+    }
+  }
+
+  Future<void> _fetchUserName() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      DocumentSnapshot userDoc =
+          await _firestore.collection('users').doc(user.uid).get();
+      setState(() {
+        userName = userDoc['name'];
+      });
+    }
+  }
+
+  Future<void> _fetchSliderImages() async {
+    try {
+      QuerySnapshot bannerSnapshot =
+          await _firestore.collection('promotion_banner').get();
+      List<String> imageUrls = [];
+
+      for (var bannerDoc in bannerSnapshot.docs) {
+        String serviceName = bannerDoc['serviceName'];
+        String docId = bannerDoc['docId'];
+
+        DocumentSnapshot serviceDoc =
+            await _firestore.collection(serviceName).doc(docId).get();
+
+        if (serviceDoc.exists) {
+          List<dynamic> images = serviceDoc['imageUrls'];
+          if (images.isNotEmpty) {
+            imageUrls.add(images[0]);
+          }
+        }
+      }
+
+      setState(() {
+        sliderImages = imageUrls;
+      });
+    } catch (e) {
+      _showErrorSnackbar(
+          "Failed to fetch slider images. Please try again later.");
     }
   }
 
@@ -107,88 +157,173 @@ class _home_screemState extends State<home_screem> {
     }
   }
 
+  void _showProfileModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.book),
+                title: const Text('View Bookings'),
+                onTap: () {
+                  Navigator.pop(context);
+                  // Navigate to bookings screen
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showLikedServicesModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Liked Services',
+                  style:
+                      TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
+              // Add your liked services list here
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showBookingHistoryModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Booking History',
+                  style:
+                      TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
+              // Add your booking history list here
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Home"),
-        backgroundColor: Colors.blue,
-        elevation: 0,
-        actions: [
-          PopupMenuButton(
-            onSelected: (value) {
-              if (value == 'help') {
-                print('Help selected');
-              } else if (value == 'settings') {
-                print('Settings selected');
-              } else if (value == 'profile') {
-                print('Profile selected');
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'help', child: Text('Help')),
-              const PopupMenuItem(value: 'settings', child: Text('Settings')),
-              const PopupMenuItem(value: 'profile', child: Text('Profile')),
-            ],
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: _searchController,
-                onChanged: (value) {
-                  print('Search for: $value');
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            floating: true,
+            snap: true,
+            backgroundColor: Colors.blue,
+            title: const Text("Home"),
+            leading: IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () {
+                _showBookingHistoryModal(context);
+              },
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.person),
+                onPressed: () {
+                  _showProfileModal(context);
                 },
-                decoration: const InputDecoration(
-                  labelText: "Search categories",
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.search),
+              ),
+            ],
+            bottom: AppBar(
+              backgroundColor: Colors.blue,
+              title: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            SearchScreen()), // Navigate to the search screen
+                  );
+                },
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: "Search vendors",
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10.0),
+                    ),
+                    prefixIcon: const Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  enabled:
+                      false, // Disable the TextField to make it non-editable
                 ),
               ),
-              const SizedBox(height: 20),
-              _buildCarouselSlider(),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildServiceButton("Asian"),
-                  const SizedBox(width: 10),
-                  _buildServiceButton("European"),
-                ],
-              ),
-              const SizedBox(height: 40),
-              const Text("Categories",
-                  style:
-                      TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              _buildCategoryList(),
-              const SizedBox(height: 40),
-              const Text("Top Deals",
-                  style:
-                      TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              isLoadingDeals
-                  ? const Center(child: CircularProgressIndicator())
-                  : topDeals.isEmpty
-                      ? _buildPlaceholderList()
-                      : _buildTopDealsList(),
-            ],
+            ),
           ),
-        ),
+          SliverList(
+            delegate: SliverChildListDelegate(
+              [
+                const SizedBox(height: 20),
+                _buildSearchResults(),
+                const SizedBox(height: 20),
+                _buildCarouselSlider(),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("Services: ",
+                        style: TextStyle(
+                            fontSize: 18.0, fontWeight: FontWeight.bold)),
+                    _buildServiceButton("Asian"),
+                    const SizedBox(width: 10),
+                    _buildServiceButton("European"),
+                  ],
+                ),
+                const SizedBox(height: 40),
+                const Text("Categories",
+                    style:
+                        TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                _buildCategoryList(),
+                const SizedBox(height: 40),
+                const Text("Top Deals",
+                    style:
+                        TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                isLoadingDeals
+                    ? const Center(child: CircularProgressIndicator())
+                    : _buildTopDealsList(),
+              ],
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.favorite), label: "Favorites"),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
         onTap: (index) {
           if (index == 1) {
-            print('Navigate to Profile');
+            _showLikedServicesModal(context);
+          } else if (index == 2) {
+            _showProfileModal(context);
           }
         },
       ),
@@ -196,12 +331,6 @@ class _home_screemState extends State<home_screem> {
   }
 
   Widget _buildCarouselSlider() {
-    List<String> sliderImages = [
-      'https://via.placeholder.com/400',
-      'https://via.placeholder.com/400',
-      'https://via.placeholder.com/400',
-    ];
-
     return CarouselSlider(
       options: CarouselOptions(
         height: 200.0,
@@ -212,8 +341,24 @@ class _home_screemState extends State<home_screem> {
       items: sliderImages.map((imageUrl) {
         return Builder(
           builder: (BuildContext context) {
-            return Image.network(imageUrl,
-                fit: BoxFit.cover, width: MediaQuery.of(context).size.width);
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10.0),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.5),
+                    blurRadius: 4,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10.0),
+                child: Image.network(imageUrl,
+                    fit: BoxFit.cover,
+                    width: MediaQuery.of(context).size.width),
+              ),
+            );
           },
         );
       }).toList(),
@@ -228,11 +373,13 @@ class _home_screemState extends State<home_screem> {
         });
       },
       style: ElevatedButton.styleFrom(
-        foregroundColor: selectedService == service
-            ? Colors.white
-            : const Color.fromARGB(255, 38, 82, 165),
+        foregroundColor:
+            selectedService == service ? Colors.white : Colors.blue,
         backgroundColor:
             selectedService == service ? Colors.blue : Colors.grey[300],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.0),
+        ),
       ),
       child: Text(service),
     );
@@ -297,15 +444,6 @@ class _home_screemState extends State<home_screem> {
     );
   }
 
-  Widget _buildPlaceholderList() {
-    return Center(
-      child: Text(
-        "No deals available at the moment.",
-        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-      ),
-    );
-  }
-
   Widget _buildTopDealsList() {
     return ListView.builder(
       shrinkWrap: true,
@@ -315,9 +453,49 @@ class _home_screemState extends State<home_screem> {
         final deal = topDeals[index];
         return Card(
           child: ListTile(
-            leading: const Icon(Icons.local_offer),
-            title: Text(deal['title'] ?? 'No title'),
+            leading: deal['imageUrl'] != null
+                ? Image.network(deal['imageUrl'], width: 50, height: 50)
+                : const Icon(Icons.local_offer),
+            title: Text(deal['vendorName'] ?? 'No vendor name'),
             subtitle: Text(deal['description'] ?? 'No description'),
+            trailing: ElevatedButton(
+              onPressed: () {
+                // Handle view button press
+                print('View button pressed for ${deal['vendorName']}');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+              ),
+              child: const Text('View'),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchResults() {
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: searchResults.length,
+      itemBuilder: (context, index) {
+        final vendor = searchResults[index];
+        return Card(
+          child: ListTile(
+            leading: vendor['imageUrl'] != null
+                ? Image.network(vendor['imageUrl'], width: 50, height: 50)
+                : const Icon(Icons.store),
+            title: Text(vendor['name'] ?? 'No name'),
+            subtitle: Text(vendor['location'] ?? 'No location'),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete),
+              onPressed: () {
+                setState(() {
+                  searchResults.removeAt(index);
+                });
+              },
+            ),
           ),
         );
       },
