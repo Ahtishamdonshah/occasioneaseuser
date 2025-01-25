@@ -12,7 +12,6 @@ import 'package:occasioneaseuser/Screens/photographer.dart';
 import 'package:occasioneaseuser/Screens/saloon.dart';
 import 'package:occasioneaseuser/Screens/search.dart';
 import 'package:occasioneaseuser/Screens/weather.dart';
-// Import the search screen
 
 class home_screem extends StatefulWidget {
   const home_screem({Key? key}) : super(key: key);
@@ -74,11 +73,16 @@ class _home_screemState extends State<home_screem> {
   Future<void> _fetchUserName() async {
     User? user = _auth.currentUser;
     if (user != null) {
-      DocumentSnapshot userDoc =
-          await _firestore.collection('users').doc(user.uid).get();
-      setState(() {
-        userName = userDoc['name'];
-      });
+      try {
+        DocumentSnapshot userDoc =
+            await _firestore.collection('users').doc(user.uid).get();
+        setState(() {
+          userName = userDoc['name'];
+        });
+      } catch (e) {
+        _showErrorSnackbar(
+            "Failed to fetch user name. Please try again later.");
+      }
     }
   }
 
@@ -118,60 +122,25 @@ class _home_screemState extends State<home_screem> {
     );
   }
 
-  Future<void> _navigateToPage(String categoryName) async {
-    try {
-      Widget screen;
-      switch (categoryName) {
-        case 'Weather':
-          screen = const Weather();
-          break;
-        case 'Beauty Parlor':
-          screen = const beauty_porlor();
-          break;
-        case 'Catering':
-          screen = const catering();
-          break;
-        case 'Marriage Hall':
-          screen = const MarriageHall();
-          break;
-        case 'FarmHouse':
-          screen = const farmhouse();
-          break;
-        case 'Photographer':
-          screen = const photographer();
-          break;
-        case 'Saloon':
-          screen = const Saloon();
-          break;
-        case 'Custom': // Handle navigation to CustomScreen
-          screen = const ComboDealsSelector();
-          break;
-        default:
-          throw Exception("Unknown category: $categoryName");
-      }
-      await Navigator.push(
-          context, MaterialPageRoute(builder: (context) => screen));
-    } catch (e) {
-      _showErrorSnackbar(
-          "Failed to navigate to the $categoryName screen. Error: $e");
-    }
-  }
-
   void _showProfileModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
         return Container(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(16.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                leading: const Icon(Icons.book),
-                title: const Text('View Bookings'),
+                leading: Icon(Icons.person),
+                title: Text(userName ?? 'Guest'),
+              ),
+              ListTile(
+                leading: Icon(Icons.logout),
+                title: Text('Logout'),
                 onTap: () {
+                  _auth.signOut();
                   Navigator.pop(context);
-                  // Navigate to bookings screen
                 },
               ),
             ],
@@ -181,49 +150,32 @@ class _home_screemState extends State<home_screem> {
     );
   }
 
-  void _showLikedServicesModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Liked Services',
-                  style:
-                      TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
-              // Add your liked services list here
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showBookingHistoryModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Booking History',
-                  style:
-                      TextStyle(fontSize: 18.0, fontWeight: FontWeight.bold)),
-              // Add your booking history list here
-            ],
-          ),
-        );
-      },
+  void _navigateToNavigatorPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => NavigatorPage()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.blue,
+        title: const Text("Home"),
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: _navigateToNavigatorPage,
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              _showProfileModal(context);
+            },
+          ),
+        ],
+      ),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -231,54 +183,33 @@ class _home_screemState extends State<home_screem> {
             floating: true,
             snap: true,
             backgroundColor: Colors.blue,
-            title: const Text("Home"),
-            leading: IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () {
-                _showBookingHistoryModal(context);
+            title: GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          SearchScreen()), // Navigate to the search screen
+                );
               },
-            ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.person),
-                onPressed: () {
-                  _showProfileModal(context);
-                },
-              ),
-            ],
-            bottom: AppBar(
-              backgroundColor: Colors.blue,
-              title: GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                            SearchScreen()), // Navigate to the search screen
-                  );
-                },
-                child: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: "Search vendors",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    prefixIcon: const Icon(Icons.search),
-                    filled: true,
-                    fillColor: Colors.white,
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: "Search vendors",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10.0),
                   ),
-                  enabled:
-                      false, // Disable the TextField to make it non-editable
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
                 ),
+                enabled: false, // Disable the TextField to make it non-editable
               ),
             ),
           ),
           SliverList(
             delegate: SliverChildListDelegate(
               [
-                const SizedBox(height: 20),
-                _buildSearchResults(),
                 const SizedBox(height: 20),
                 _buildCarouselSlider(),
                 const SizedBox(height: 20),
@@ -385,6 +316,45 @@ class _home_screemState extends State<home_screem> {
     );
   }
 
+  Future<void> _navigateToPage(String categoryName) async {
+    switch (categoryName) {
+      case 'Beauty Parlor':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => beauty_porlor()));
+        break;
+      case 'Catering':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => catering()));
+        break;
+      case 'FarmHouse':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => farmhouse()));
+        break;
+      case 'Photographer':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => photographer()));
+        break;
+      case 'Weather':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => Weather()));
+        break;
+      case 'Marriage Hall':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => MarriageHall()));
+        break;
+      case 'Saloon':
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => Saloon()));
+        break;
+      case 'Custom':
+        Navigator.push(context,
+            MaterialPageRoute(builder: (context) => ComboDealsSelector()));
+        break;
+      default:
+        _showErrorSnackbar("Unknown category: $categoryName");
+    }
+  }
+
   Widget _buildCategoryList() {
     return GridView.builder(
       shrinkWrap: true,
@@ -474,31 +444,62 @@ class _home_screemState extends State<home_screem> {
     );
   }
 
-  Widget _buildSearchResults() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: searchResults.length,
-      itemBuilder: (context, index) {
-        final vendor = searchResults[index];
-        return Card(
-          child: ListTile(
-            leading: vendor['imageUrl'] != null
-                ? Image.network(vendor['imageUrl'], width: 50, height: 50)
-                : const Icon(Icons.store),
-            title: Text(vendor['name'] ?? 'No name'),
-            subtitle: Text(vendor['location'] ?? 'No location'),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: () {
-                setState(() {
-                  searchResults.removeAt(index);
-                });
-              },
-            ),
+  void _showLikedServicesModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.favorite),
+                title: Text('Liked Services'),
+              ),
+              // Add more liked services here
+            ],
           ),
         );
       },
+    );
+  }
+
+  // Removed unused _buildSearchResults method
+}
+
+class NavigatorPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.blue,
+        title: const Text("Navigator"),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+      ),
+      body: ListView(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.book),
+            title: const Text('Bookings'),
+            onTap: () {
+              // Navigate to bookings screen
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: const Text('History'),
+            onTap: () {
+              // Navigate to history screen
+            },
+          ),
+        ],
+      ),
     );
   }
 }

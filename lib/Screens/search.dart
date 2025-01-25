@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:occasioneaseuser/Screens/CateringDetailsScreen.dart';
+import 'package:occasioneaseuser/Screens/FarmhouseDetailsScreen.dart';
+import 'package:occasioneaseuser/Screens/MarriageHallDetailingScreen.dart';
+import 'package:occasioneaseuser/Screens/ParlorDetailsScreen.dart';
+import 'package:occasioneaseuser/Screens/PhotographerDetailsScreen.dart';
+import 'package:occasioneaseuser/Screens/SalonDetailsScreen.dart';
 
 class SearchScreen extends StatefulWidget {
   @override
@@ -43,6 +49,8 @@ class _SearchScreenState extends State<SearchScreen> {
               nameField = data['parlorName']?.toLowerCase() ?? '';
               break;
             case 'Catering':
+              nameField = data['cateringCompanyName']?.toLowerCase() ?? '';
+              break;
             case 'Farm Houses':
             case 'Marriage Halls':
               nameField = data['name']?.toLowerCase() ?? '';
@@ -57,6 +65,7 @@ class _SearchScreenState extends State<SearchScreen> {
           if (nameField.contains(vendorName)) {
             setState(() {
               searchResults.add({
+                'id': doc.id,
                 'category': category,
                 'data': data,
               });
@@ -74,6 +83,92 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  Future<void> _navigateToDetailsScreen(Map<String, dynamic> vendor) async {
+    String category = vendor['category'];
+    String vendorId = vendor['id'];
+    Map<String, dynamic> vendorData = vendor['data'];
+    List<String> timeslots = List<String>.from(vendorData['timeslots'] ?? []);
+
+    switch (category) {
+      case 'Beauty Parlors':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ParlorDetailsScreen(
+              parlorId: vendorId,
+              parlorData: vendorData,
+              timeSlots: timeslots,
+            ),
+          ),
+        );
+        break;
+      case 'Saloons':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SalonDetailsScreen(
+              salonId: vendorId,
+              salonData: vendorData,
+              timeSlots: timeslots,
+            ),
+          ),
+        );
+        break;
+      case 'Catering':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CateringDetailsScreen(
+              cateringId: vendorId,
+              cateringData: vendorData,
+              timeSlots: timeslots,
+            ),
+          ),
+        );
+        break;
+      case 'Photographer':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhotographerDetailsScreen(
+              photographerId: vendorId,
+              photographerData: vendorData,
+              timeSlots: timeslots,
+            ),
+          ),
+        );
+        break;
+      case 'Farm Houses':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FarmhouseDetailsScreen(
+              farmhouseId: vendorId,
+              farmhouseData: vendorData,
+              timeSlots: timeslots,
+            ),
+          ),
+        );
+        break;
+      case 'Marriage Halls':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarriageHallDetailingScreen(
+              hallId: vendorId,
+              hallData: vendorData,
+              timeSlots: timeslots,
+            ),
+          ),
+        );
+        break;
+      default:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unknown category: $category')),
+        );
+    }
+  }
+
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: Colors.red),
@@ -85,6 +180,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search Vendors'),
+        backgroundColor: Colors.blue,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -98,6 +194,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   borderRadius: BorderRadius.circular(10.0),
                 ),
                 prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
               ),
               onSubmitted: (value) {
                 _searchVendor();
@@ -108,7 +206,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : Expanded(
                     child: searchResults.isEmpty
-                        ? const Center(child: Text('Not found your vendor'))
+                        ? const Center(child: Text('No vendors found'))
                         : ListView.builder(
                             itemCount: searchResults.length,
                             itemBuilder: (context, index) {
@@ -123,6 +221,8 @@ class _SearchScreenState extends State<SearchScreen> {
                                   displayName = data['parlorName'];
                                   break;
                                 case 'Catering':
+                                  displayName = data['cateringCompanyName'];
+                                  break;
                                 case 'Farm Houses':
                                 case 'Marriage Halls':
                                   displayName = data['name'];
@@ -135,9 +235,15 @@ class _SearchScreenState extends State<SearchScreen> {
                               }
 
                               return Card(
+                                elevation: 4,
+                                margin:
+                                    const EdgeInsets.symmetric(vertical: 10),
                                 child: ListTile(
-                                  title: Text(displayName),
+                                  title: Text(displayName,
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold)),
                                   subtitle: Text('Category: $category'),
+                                  onTap: () => _navigateToDetailsScreen(result),
                                 ),
                               );
                             },
