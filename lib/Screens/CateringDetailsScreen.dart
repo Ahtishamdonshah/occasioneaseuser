@@ -42,7 +42,6 @@ class _CateringDetailsScreenState extends State<CateringDetailsScreen> {
         List<String>.from(widget.cateringData['imageUrls'] ?? []);
     final String name = widget.cateringData['cateringCompanyName'] ?? 'N/A';
     final String location = widget.cateringData['location'] ?? 'N/A';
-    // final String userId = widget.cateringData['userId'] ?? 'Unknown User';
 
     return Scaffold(
       appBar: AppBar(

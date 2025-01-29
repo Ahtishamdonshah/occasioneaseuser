@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'availabilitycatering.dart';
 
 class QuantityCatering extends StatefulWidget {
@@ -23,6 +24,7 @@ class _QuantityCateringState extends State<QuantityCatering> {
   final Map<String, int> _quantities = {};
   DateTime? _selectedDate;
   String? _selectedTimeSlot;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void initState() {
@@ -45,6 +47,26 @@ class _QuantityCateringState extends State<QuantityCatering> {
         _selectedDate = pickedDate;
         _selectedTimeSlot = null;
       });
+    }
+  }
+
+  Future<int> _getBookedCapacity(String date, String timeSlot) async {
+    try {
+      final bookings = await _firestore
+          .collection('CateringBookings')
+          .where('cateringId', isEqualTo: widget.cateringId)
+          .where('date', isEqualTo: date)
+          .where('timeSlot', isEqualTo: timeSlot)
+          .get();
+
+      int totalBooked = 0;
+      for (var booking in bookings.docs) {
+        totalBooked += (booking['totalQuantity'] ?? 0) as int;
+      }
+      return totalBooked;
+    } catch (e) {
+      print('Error fetching bookings: $e');
+      return 0;
     }
   }
 
@@ -172,19 +194,36 @@ class _QuantityCateringState extends State<QuantityCatering> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                Column(
-                  children: widget.timeSlots.map((slot) {
-                    return RadioListTile<String>(
-                      title: Text(slot),
-                      value: slot,
-                      groupValue: _selectedTimeSlot,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedTimeSlot = value;
-                        });
-                      },
+                FutureBuilder<List<Map<String, dynamic>>>(
+                  future: _getAvailableTimeSlots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const CircularProgressIndicator();
+                    }
+                    if (snapshot.hasError) {
+                      return Text('Error: ${snapshot.error}');
+                    }
+                    final availableSlots = snapshot.data ?? [];
+                    return Column(
+                      children: availableSlots.map((slot) {
+                        final isAvailable = slot['available'] as bool;
+                        return RadioListTile<String>(
+                          title: Text(
+                            '${slot['timeSlot']} ${isAvailable ? '' : '(Not Available)'}',
+                          ),
+                          value: slot['timeSlot'],
+                          groupValue: _selectedTimeSlot,
+                          onChanged: isAvailable
+                              ? (value) {
+                                  setState(() {
+                                    _selectedTimeSlot = value;
+                                  });
+                                }
+                              : null,
+                        );
+                      }).toList(),
                     );
-                  }).toList(),
+                  },
                 ),
               ],
               const SizedBox(height: 16),
@@ -199,5 +238,23 @@ class _QuantityCateringState extends State<QuantityCatering> {
         ),
       ),
     );
+  }
+
+  Future<List<Map<String, dynamic>>> _getAvailableTimeSlots() async {
+    final List<Map<String, dynamic>> availableSlots = [];
+    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+
+    for (var slot in widget.timeSlots) {
+      final bookedCapacity = await _getBookedCapacity(dateStr, slot);
+      final totalCapacity = 2; // Replace with actual capacity from Firestore
+      final isAvailable = bookedCapacity < totalCapacity;
+
+      availableSlots.add({
+        'timeSlot': slot,
+        'available': isAvailable,
+      });
+    }
+
+    return availableSlots;
   }
 }

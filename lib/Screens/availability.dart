@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:occasioneaseuser/Screens/stripe.dart';
 
 class availability extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
@@ -54,45 +53,43 @@ class _availabilityState extends State<availability> {
         return;
       }
 
-      // Navigate to the StripePayment screen
-      final paymentSuccess = await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => StripePayment(price: _totalPrice.toString()),
-        ),
-      );
+      // // Navigate to the StripePayment screen
+      // final paymentSuccess = await Navigator.of(context).push(
+      //   MaterialPageRoute(
+      //     builder: (context) => StripePayment(price: _totalPrice.toString()),
+      //   ),
+      // );
 
       // If payment is successful, save the booking data to Firebase
-      if (paymentSuccess == true) {
-        await FirebaseFirestore.instance
-            .collection('BeautyParlorBookings')
-            .add({
-          'userId': user.uid,
-          'beautyParlorId': widget.beautyParlorId,
-          'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
-          'timeSlot': widget.selectedTimeSlot,
-          'services': widget.selectedServices
-              .map((service) => {
-                    'name': service['name'],
-                    'quantity': widget.quantities[service['name']],
-                    'price': service['price']
-                  })
-              .toList(),
-          'totalPrice': _totalPrice,
-          'status': 'Pending',
-        });
+      //  if (paymentSuccess == true) {
+      await FirebaseFirestore.instance.collection('BeautyParlorBookings').add({
+        'userId': user.uid,
+        'beautyParlorId': widget.beautyParlorId,
+        'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
+        'timeSlot': widget.selectedTimeSlot,
+        'services': widget.selectedServices
+            .map((service) => {
+                  'name': service['name'],
+                  'quantity': widget.quantities[service['name']],
+                  'price': service['price']
+                })
+            .toList(),
+        'totalPrice': _totalPrice,
+        'status': 'Pending',
+      });
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Beauty Parlor Service Booked Successfully')),
-        );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Beauty Parlor Service Booked Successfully')),
+      );
 
-        // Navigate back or to another page if needed
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Payment failed, booking not completed')),
-        );
-      }
+      // Navigate back or to another page if needed
+      // } else {
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     const SnackBar(
+      //         content: Text('Payment failed, booking not completed')),
+      //   );
+      // }
     } catch (e) {
       print('Error booking beauty parlor service: $e');
       ScaffoldMessenger.of(context).showSnackBar(
