@@ -88,7 +88,8 @@ class _SearchScreenState extends State<SearchScreen> {
     String vendorId = vendor['id'];
     Map<String, dynamic> vendorData = vendor['data'];
     List<String> timeslots = List<String>.from(vendorData['timeslots'] ?? []);
-
+    final List<Map<String, dynamic>> timeSlots =
+        List<Map<String, dynamic>>.from(vendorData['timeSlots'] ?? []);
     switch (category) {
       case 'Beauty Parlors':
         Navigator.push(
@@ -97,7 +98,7 @@ class _SearchScreenState extends State<SearchScreen> {
             builder: (context) => ParlorDetailsScreen(
               parlorId: vendorId,
               parlorData: vendorData,
-              timeSlots: timeslots,
+              timeSlots: timeSlots,
             ),
           ),
         );

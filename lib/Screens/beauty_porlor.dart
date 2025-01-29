@@ -1,9 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/ParlorDetailsScreen.dart';
 
-class beauty_porlor extends StatelessWidget {
+class beauty_porlor extends StatefulWidget {
   const beauty_porlor({Key? key}) : super(key: key);
+
+  @override
+  _beauty_porlorState createState() => _beauty_porlorState();
+}
+
+class _beauty_porlorState extends State<beauty_porlor> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      final favoritesRef = _firestore
+          .collection('userFavorites')
+          .doc(user.uid)
+          .collection('vendors');
+
+      final userFavoritesRef = _firestore
+          .collection('userFavorites')
+          .doc(user.uid)
+          .collection('vendors');
+
+      if (isFavorite) {
+        // Remove from vendor's favorites
+        // await favoritesRef.doc(user.uid).delete();
+        // Remove from user's favorites
+        await userFavoritesRef.doc(vendorId).delete();
+      } else {
+        // Add to vendor's favorites
+        //   await favoritesRef.doc(user.uid).set({'userId': user.uid});
+        // Add to user's favorites
+        await userFavoritesRef.doc(vendorId).set({'vendorId': vendorId});
+      }
+    }
+  }
+
+  Stream<bool> _isFavoriteStream(String vendorId) {
+    final user = _auth.currentUser;
+    if (user != null) {
+      return _firestore
+          .collection('userFavorites')
+          .doc(user.uid)
+          .collection('vendors')
+          .doc(vendorId)
+          .snapshots()
+          .map((snapshot) => snapshot.exists);
+    }
+    return Stream.value(false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,8 +62,7 @@ class beauty_porlor extends StatelessWidget {
         title: const Text("Beauty Parlors"),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance.collection('Beauty Parlors').snapshots(),
+        stream: _firestore.collection('Beauty Parlors').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -22,62 +71,62 @@ class beauty_porlor extends StatelessWidget {
             return const Center(child: Text('Error fetching data'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No parlors found'));
+            return const Center(child: Text('No vendors found'));
           }
 
-          final parlors = snapshot.data!.docs;
-
           return ListView.builder(
-            itemCount: parlors.length,
+            itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
-              final doc = parlors[index];
+              final doc = snapshot.data!.docs[index];
               final data = doc.data() as Map<String, dynamic>;
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  title: Text(
-                    data['parlorName'] ?? 'Unnamed Parlor',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(data['location'] ?? 'Location not provided'),
-                  trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () async {
-                    // Fetching the time slots before navigation
-                    List<String> timeSlots = [];
-                    try {
-                      final parlorDoc = await FirebaseFirestore.instance
-                          .collection('Beauty Parlors')
-                          .doc(doc.id)
-                          .get();
+              final vendorId = doc.id;
+              final vendorName = data['parlorName'] ?? 'Unknown';
 
-                      // Extracting time slots in the format: "startTime - endTime"
-                      final slots = parlorDoc.data()?['timeSlots'] ?? [];
-                      for (var slot in slots) {
-                        String startTime = slot['startTime'] ?? '';
-                        String endTime = slot['endTime'] ?? '';
-                        timeSlots.add('$startTime - $endTime');
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Error fetching time slots')),
-                      );
-                    }
-
-                    // Navigating to the ParlorDetailsScreen with all necessary data
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ParlorDetailsScreen(
-                          parlorId: doc.id,
-                          parlorData: data,
-                          timeSlots:
-                              timeSlots, // Passing the formatted timeSlots here
-                        ),
-                      ),
+              return StreamBuilder<bool>(
+                stream: _isFavoriteStream(vendorId),
+                builder: (context, favoriteSnapshot) {
+                  if (favoriteSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return ListTile(
+                      title: Text(vendorName),
+                      trailing: const CircularProgressIndicator(),
                     );
-                  },
-                ),
+                  }
+
+                  bool isFavorite = favoriteSnapshot.data ?? false;
+
+                  return Card(
+                    elevation: 4,
+                    margin: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 16),
+                    child: ListTile(
+                      title: Text(vendorName,
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: IconButton(
+                        icon: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: isFavorite ? Colors.red : null,
+                        ),
+                        onPressed: () async {
+                          await _toggleFavorite(vendorId, isFavorite);
+                        },
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ParlorDetailsScreen(
+                              parlorId: vendorId,
+                              parlorData: data,
+                              timeSlots: List<Map<String, dynamic>>.from(
+                                  data['timeSlots'] ?? []),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
               );
             },
           );

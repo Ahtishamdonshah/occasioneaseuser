@@ -7,6 +7,7 @@ import 'package:occasioneaseuser/Screens/beauty_porlor.dart';
 import 'package:occasioneaseuser/Screens/catering.dart';
 import 'package:occasioneaseuser/Screens/customscreen.dart';
 import 'package:occasioneaseuser/Screens/farmhouse.dart';
+import 'package:occasioneaseuser/Screens/heart.dart';
 import 'package:occasioneaseuser/Screens/marriage_hall.dart';
 import 'package:occasioneaseuser/Screens/photographer.dart';
 import 'package:occasioneaseuser/Screens/saloon.dart';
@@ -445,23 +446,11 @@ class _home_screemState extends State<home_screem> {
   }
 
   void _showLikedServicesModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Container(
-          padding: EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: Icon(Icons.favorite),
-                title: Text('Liked Services'),
-              ),
-              // Add more liked services here
-            ],
-          ),
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HeartScreen(),
+      ),
     );
   }
 

@@ -1,9 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/FarmhouseDetailsScreen.dart';
 
-class farmhouse extends StatelessWidget {
+class farmhouse extends StatefulWidget {
   const farmhouse({Key? key}) : super(key: key);
+
+  @override
+  _farmhouseState createState() => _farmhouseState();
+}
+
+class _farmhouseState extends State<farmhouse> {
+  Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final vendorFavoritesRef = FirebaseFirestore.instance
+          .collection('userFavorites')
+          .doc(user.uid)
+          .collection('vendors');
+      final userFavoritesRef = FirebaseFirestore.instance
+          .collection('userFavorites')
+          .doc(user.uid)
+          .collection('vendors');
+
+      if (isFavorite) {
+        //  await vendorFavoritesRef.doc(user.uid).delete();
+        await userFavoritesRef.doc(vendorId).delete();
+      } else {
+        // await vendorFavoritesRef.doc(user.uid).set({'userId': user.uid});
+        await userFavoritesRef.doc(vendorId).set({'vendorId': vendorId});
+      }
+    }
+  }
+
+  Stream<bool> _isFavoriteStream(String vendorId) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      return FirebaseFirestore.instance
+          .collection('userFavorites')
+          .doc(user.uid)
+          .collection('vendors')
+          .doc(vendorId)
+          .snapshots()
+          .map((doc) => doc.exists);
+    }
+    return Stream.value(false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,62 +64,62 @@ class farmhouse extends StatelessWidget {
             return const Center(child: Text('Error fetching data'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No farmhouses found'));
+            return const Center(child: Text('No vendors found'));
           }
 
-          final farmhouses = snapshot.data!.docs;
-
           return ListView.builder(
-            itemCount: farmhouses.length,
+            itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
-              final doc = farmhouses[index];
+              final doc = snapshot.data!.docs[index];
               final data = doc.data() as Map<String, dynamic>;
+              final vendorId = doc.id;
+              final vendorName = data['name'] ?? 'Unknown';
 
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  title: Text(
-                    data['name'] ?? 'Unnamed Farmhouse',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    "Location: ${data['location'] ?? 'Not provided'}",
-                  ),
-                  trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () async {
-                    List<String> timeSlots = [];
-                    try {
-                      final farmhouseDoc = await FirebaseFirestore.instance
-                          .collection('Farm Houses')
-                          .doc(doc.id)
-                          .get();
-
-                      final slots = farmhouseDoc.data()?['timeSlots'] ?? [];
-                      for (var slot in slots) {
-                        String startTime = slot['startTime'] ?? '';
-                        String endTime = slot['endTime'] ?? '';
-                        timeSlots.add('$startTime - $endTime');
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Error fetching time slots')),
-                      );
-                    }
-
-                    // Navigating to the FarmhouseDetailsScreen
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => FarmhouseDetailsScreen(
-                          farmhouseId: doc.id,
-                          farmhouseData: data,
-                          timeSlots: timeSlots,
-                        ),
-                      ),
+              return StreamBuilder<bool>(
+                stream: _isFavoriteStream(vendorId),
+                builder: (context, favoriteSnapshot) {
+                  if (favoriteSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return ListTile(
+                      title: Text(vendorName),
+                      trailing: const CircularProgressIndicator(),
                     );
-                  },
-                ),
+                  }
+
+                  bool isFavorite = favoriteSnapshot.data ?? false;
+
+                  return Card(
+                    elevation: 4,
+                    margin: const EdgeInsets.symmetric(
+                        vertical: 10, horizontal: 16),
+                    child: ListTile(
+                      title: Text(vendorName,
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      trailing: IconButton(
+                        icon: Icon(
+                          isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: isFavorite ? Colors.red : null,
+                        ),
+                        onPressed: () async {
+                          await _toggleFavorite(vendorId, isFavorite);
+                        },
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FarmhouseDetailsScreen(
+                              farmhouseId: vendorId,
+                              farmhouseData: data,
+                              timeSlots:
+                                  List<String>.from(data['timeslots'] ?? []),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
               );
             },
           );

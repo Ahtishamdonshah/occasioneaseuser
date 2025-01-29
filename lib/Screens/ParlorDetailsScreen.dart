@@ -4,13 +4,13 @@ import 'package:occasioneaseuser/Screens/quantityanddate.dart';
 class ParlorDetailsScreen extends StatefulWidget {
   final String parlorId;
   final Map<String, dynamic> parlorData;
-  final List<String> timeSlots;
+  final List<Map<String, dynamic>> timeSlots;
 
   const ParlorDetailsScreen({
     Key? key,
     required this.parlorId,
     required this.parlorData,
-    required this.timeSlots, // Receiving timeSlots here
+    required this.timeSlots,
   }) : super(key: key);
 
   @override
@@ -144,10 +144,10 @@ class _ParlorDetailsScreenState extends State<ParlorDetailsScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => quantityanddate(
+                            builder: (context) => QuantityAndDate(
                               selectedSubservices: selectedServices,
                               parlorId: widget.parlorId,
-                              timeSlots: widget.timeSlots, // Passing timeSlots
+                              timeSlots: widget.timeSlots,
                             ),
                           ),
                         );
