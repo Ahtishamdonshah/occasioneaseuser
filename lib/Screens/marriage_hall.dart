@@ -111,8 +111,8 @@ class _MarriageHallState extends State<MarriageHall> {
                             builder: (context) => MarriageHallDetailingScreen(
                               hallId: vendorId,
                               hallData: data,
-                              timeSlots:
-                                  List<String>.from(data['timeslots'] ?? []),
+                              timeSlots: List<Map<String, dynamic>>.from(
+                                  data['timeSlots'] ?? []),
                             ),
                           ),
                         );

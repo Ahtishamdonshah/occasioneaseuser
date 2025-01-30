@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:occasioneaseuser/Screens/quantitymarriagehall.dart';
 
 class MarriageHallDetailingScreen extends StatefulWidget {
   final String hallId;
   final Map<String, dynamic> hallData;
-  final List<String> timeSlots;
+  final List<Map<String, dynamic>> timeSlots;
 
   const MarriageHallDetailingScreen({
     Key? key,
@@ -20,157 +21,185 @@ class MarriageHallDetailingScreen extends StatefulWidget {
 
 class _MarriageHallDetailingScreenState
     extends State<MarriageHallDetailingScreen> {
-  final Map<String, List<Map<String, dynamic>>> _servicesByCategory = {};
-  final Map<String, List<bool>> _selectedSubServices = {};
-
-  @override
-  void initState() {
-    super.initState();
-    final List<dynamic> services = widget.hallData['additionalServices'] ?? [];
-    for (var service in services) {
-      final category = service['category'] ?? 'Other';
-      if (!_servicesByCategory.containsKey(category)) {
-        _servicesByCategory[category] = [];
-        _selectedSubServices[category] = [];
-      }
-      _servicesByCategory[category]!.add(service);
-      _selectedSubServices[category]!.add(false);
-    }
-  }
+  List<Map<String, dynamic>> selectedServices = [];
+  final TextEditingController _personsController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
   @override
   Widget build(BuildContext context) {
+    int minCapacity = widget.hallData['minCapacity'] ?? 0;
+    int maxCapacity = widget.hallData['maxCapacity'] ?? 0;
+    double pricePerSeat = widget.hallData['pricePerSeat'] ?? 0.0;
+    List<Map<String, dynamic>> additionalServices =
+        List<Map<String, dynamic>>.from(
+            widget.hallData['additionalServices'] ?? []);
     final List<String> images =
         List<String>.from(widget.hallData['imageUrls'] ?? []);
-    final String name = widget.hallData['name'] ?? 'N/A';
-    final String location = widget.hallData['location'] ?? 'N/A';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(name),
+        title: Text(widget.hallData['name'],
+            style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.blue.shade800,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (images.isNotEmpty)
-              Container(
-                height: 200,
-                margin: const EdgeInsets.only(bottom: 16),
-                child: PageView(
-                  children: images
-                      .map(
-                        (url) => Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Center(child: Text('Image not available')),
-                        ),
-                      )
-                      .toList(),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: [
+              if (images.isNotEmpty)
+                SizedBox(
+                  height: 220,
+                  child: PageView.builder(
+                    itemCount: images.length,
+                    itemBuilder: (context, index) {
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.network(images[index], fit: BoxFit.cover),
+                      );
+                    },
+                  ),
                 ),
-              )
-            else
-              const Center(
-                  child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('No images available'),
-              )),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name,
-                      style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text('Location: $location',
-                      style: const TextStyle(fontSize: 16)),
-                  const SizedBox(height: 16),
-                  const Text('Additional Services:',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ..._servicesByCategory.entries.map((entry) {
-                    final category = entry.key;
-                    final services = entry.value;
-                    return ExpansionTile(
-                      title: Text(
-                        category,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      children: List.generate(services.length, (index) {
-                        final service = services[index];
-                        final String serviceName = service['name'] ?? 'N/A';
-                        final double price = (service['price'] ?? 0).toDouble();
-                        return CheckboxListTile(
-                          title: Text(serviceName),
-                          subtitle:
-                              Text('Price: \$${price.toStringAsFixed(2)}'),
-                          value: _selectedSubServices[category]![index],
-                          onChanged: (bool? value) {
-                            setState(() {
-                              _selectedSubServices[category]![index] =
-                                  value ?? false;
-                            });
-                          },
-                        );
-                      }),
-                    );
-                  }),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        final selectedServices = <Map<String, dynamic>>[];
+              SizedBox(height: 20),
 
-                        _servicesByCategory.forEach((category, services) {
-                          for (int i = 0; i < services.length; i++) {
-                            if (_selectedSubServices[category]![i]) {
-                              selectedServices.add(services[i]);
-                            }
-                          }
-                        });
+              // Hall Details with Professional UI
+              Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.3),
+                      spreadRadius: 2,
+                      blurRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Location:',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900)),
+                    Text(widget.hallData['location'],
+                        style: TextStyle(fontSize: 16, color: Colors.black87)),
+                    SizedBox(height: 10),
+                    Text('Capacity:',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900)),
+                    Text('$minCapacity - $maxCapacity persons',
+                        style: TextStyle(fontSize: 16, color: Colors.black87)),
+                    SizedBox(height: 10),
+                    Text('Price per Seat:',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900)),
+                    Text('\$${pricePerSeat.toStringAsFixed(2)}',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87)),
+                  ],
+                ),
+              ),
+              SizedBox(height: 20),
 
-                        if (selectedServices.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('Please select at least one service'),
-                            ),
-                          );
-                          return;
-                        }
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                QuantityAndDateMarriageHallScreen(
-                              hallId: widget.hallId,
-                              hallData: widget.hallData,
-                              selectedServices: selectedServices,
-                              timeSlots: widget.timeSlots,
-                              selectedDate:
-                                  DateTime.now(), // Add appropriate date
-                              selectedTimeSlot: widget.timeSlots.isNotEmpty
-                                  ? widget.timeSlots[0]
-                                  : '', // Add appropriate time slot
-                              marriageHallId: widget.hallId, // Add this line
-                              pricePerSeat: widget.hallData['pricePerSeat'] ??
-                                  0.0, // Add this line
+              // Additional Services Display
+              if (additionalServices.isNotEmpty)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Additional Services:',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900)),
+                    SizedBox(height: 10),
+                    ...additionalServices.map((service) => Card(
+                          margin: EdgeInsets.symmetric(vertical: 5),
+                          child: ListTile(
+                            title: Text(service['name'],
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text('\$${service['price']} per unit'),
+                            trailing: Checkbox(
+                              value: selectedServices.contains(service),
+                              onChanged: (bool? value) {
+                                setState(() {
+                                  if (value == true) {
+                                    selectedServices.add(service);
+                                  } else {
+                                    selectedServices.remove(service);
+                                  }
+                                });
+                              },
                             ),
                           ),
-                        );
-                      },
-                      child: const Text('Add Service'),
-                    ),
-                  ),
-                ],
+                        )),
+                  ],
+                ),
+              SizedBox(height: 20),
+
+              TextFormField(
+                controller: _personsController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Number of Persons',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter number of persons';
+                  }
+                  final numPersons = int.tryParse(value);
+                  if (numPersons == null) {
+                    return 'Please enter a valid number';
+                  }
+                  if (numPersons < minCapacity || numPersons > maxCapacity) {
+                    return 'Must be between $minCapacity-$maxCapacity';
+                  }
+                  return null;
+                },
               ),
-            ),
-          ],
+              SizedBox(height: 20),
+
+              ElevatedButton(
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => QuantityAndDateMarriageHallScreen(
+                          selectedServices: selectedServices,
+                          marriageHallId: widget.hallId,
+                          timeSlots: widget.timeSlots,
+                          pricePerSeat: pricePerSeat,
+                          numberOfPersons:
+                              int.parse(_personsController.text.trim()),
+                          hallData: widget.hallData,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child:
+                    Text('Proceed to Booking', style: TextStyle(fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade800,
+                  padding: EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -110,7 +110,7 @@ class _SearchScreenState extends State<SearchScreen> {
             builder: (context) => SalonDetailsScreen(
               salonId: vendorId,
               salonData: vendorData,
-              timeSlots: timeslots,
+              timeSlots: vendorData['timeSlots'],
             ),
           ),
         );
@@ -135,7 +135,7 @@ class _SearchScreenState extends State<SearchScreen> {
             builder: (context) => PhotographerDetailsScreen(
               photographerId: vendorId,
               photographerData: vendorData,
-              timeSlots: timeslots,
+              timeSlots: vendorData['timeSlots'],
             ),
           ),
         );
@@ -144,10 +144,10 @@ class _SearchScreenState extends State<SearchScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => FarmhouseDetailsScreen(
+            builder: (context) => FarmhouseDetailingScreen(
               farmhouseId: vendorId,
               farmhouseData: vendorData,
-              timeSlots: timeslots,
+              timeSlots: vendorData['timeSlots'],
             ),
           ),
         );
@@ -159,7 +159,7 @@ class _SearchScreenState extends State<SearchScreen> {
             builder: (context) => MarriageHallDetailingScreen(
               hallId: vendorId,
               hallData: vendorData,
-              timeSlots: timeslots,
+              timeSlots: vendorData['timeSlots'],
             ),
           ),
         );

@@ -3,46 +3,43 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/SalonDetailsScreen.dart';
 
-class Saloon extends StatefulWidget {
-  const Saloon({Key? key}) : super(key: key);
+class Salon extends StatefulWidget {
+  const Salon({Key? key}) : super(key: key);
 
   @override
-  _SaloonState createState() => _SaloonState();
+  _SalonState createState() => _SalonState();
 }
 
-class _SaloonState extends State<Saloon> {
+class _SalonState extends State<Salon> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      final vendorFavoritesRef = FirebaseFirestore.instance
-          .collection('userFavorites')
-          .doc(user.uid)
-          .collection('vendors');
-      final userFavoritesRef = FirebaseFirestore.instance
+      final userFavoritesRef = _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors');
 
       if (isFavorite) {
-        //   await vendorFavoritesRef.doc(user.uid).delete();
         await userFavoritesRef.doc(vendorId).delete();
       } else {
-        //    await vendorFavoritesRef.doc(user.uid).set({'userId': user.uid});
         await userFavoritesRef.doc(vendorId).set({'vendorId': vendorId});
       }
     }
   }
 
   Stream<bool> _isFavoriteStream(String vendorId) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      return FirebaseFirestore.instance
+      return _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors')
           .doc(vendorId)
           .snapshots()
-          .map((doc) => doc.exists);
+          .map((snapshot) => snapshot.exists);
     }
     return Stream.value(false);
   }
@@ -50,11 +47,9 @@ class _SaloonState extends State<Saloon> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Saloons"),
-      ),
+      appBar: AppBar(title: const Text("Saloons")),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('Saloons').snapshots(),
+        stream: _firestore.collection('Saloons').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -63,7 +58,7 @@ class _SaloonState extends State<Saloon> {
             return const Center(child: Text('Error fetching data'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No vendors found'));
+            return const Center(child: Text('No saloons found'));
           }
 
           return ListView.builder(
@@ -99,23 +94,20 @@ class _SaloonState extends State<Saloon> {
                           isFavorite ? Icons.favorite : Icons.favorite_border,
                           color: isFavorite ? Colors.red : null,
                         ),
-                        onPressed: () async {
-                          await _toggleFavorite(vendorId, isFavorite);
-                        },
+                        onPressed: () async =>
+                            await _toggleFavorite(vendorId, isFavorite),
                       ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SalonDetailsScreen(
-                              salonId: vendorId,
-                              salonData: data,
-                              timeSlots:
-                                  List<String>.from(data['timeslots'] ?? []),
-                            ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => SalonDetailsScreen(
+                            salonId: vendorId,
+                            salonData: data,
+                            timeSlots: List<Map<String, dynamic>>.from(
+                                data['timeSlots'] ?? []),
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   );
                 },

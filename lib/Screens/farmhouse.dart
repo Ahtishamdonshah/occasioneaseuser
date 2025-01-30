@@ -1,33 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import 'package:occasioneaseuser/Screens/FarmhouseDetailsScreen.dart';
 
-class farmhouse extends StatefulWidget {
-  const farmhouse({Key? key}) : super(key: key);
+class Farmhouse extends StatefulWidget {
+  const Farmhouse({Key? key}) : super(key: key);
 
   @override
-  _farmhouseState createState() => _farmhouseState();
+  _FarmhouseState createState() => _FarmhouseState();
 }
 
-class _farmhouseState extends State<farmhouse> {
+class _FarmhouseState extends State<Farmhouse> {
   Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final vendorFavoritesRef = FirebaseFirestore.instance
-          .collection('userFavorites')
-          .doc(user.uid)
-          .collection('vendors');
       final userFavoritesRef = FirebaseFirestore.instance
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors');
 
       if (isFavorite) {
-        //  await vendorFavoritesRef.doc(user.uid).delete();
         await userFavoritesRef.doc(vendorId).delete();
       } else {
-        // await vendorFavoritesRef.doc(user.uid).set({'userId': user.uid});
         await userFavoritesRef.doc(vendorId).set({'vendorId': vendorId});
       }
     }
@@ -50,9 +45,7 @@ class _farmhouseState extends State<farmhouse> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Farmhouses"),
-      ),
+      appBar: AppBar(title: const Text("Farmhouses")),
       body: StreamBuilder<QuerySnapshot>(
         stream:
             FirebaseFirestore.instance.collection('Farm Houses').snapshots(),
@@ -60,11 +53,10 @@ class _farmhouseState extends State<farmhouse> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError) {
+          if (snapshot.hasError)
             return const Center(child: Text('Error fetching data'));
-          }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No vendors found'));
+            return const Center(child: Text('No farmhouses found'));
           }
 
           return ListView.builder(
@@ -73,50 +65,56 @@ class _farmhouseState extends State<farmhouse> {
               final doc = snapshot.data!.docs[index];
               final data = doc.data() as Map<String, dynamic>;
               final vendorId = doc.id;
-              final vendorName = data['name'] ?? 'Unknown';
+              final images = List<String>.from(data['imageUrls'] ?? []);
 
               return StreamBuilder<bool>(
                 stream: _isFavoriteStream(vendorId),
                 builder: (context, favoriteSnapshot) {
-                  if (favoriteSnapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return ListTile(
-                      title: Text(vendorName),
-                      trailing: const CircularProgressIndicator(),
-                    );
-                  }
-
-                  bool isFavorite = favoriteSnapshot.data ?? false;
-
                   return Card(
                     elevation: 4,
-                    margin: const EdgeInsets.symmetric(
-                        vertical: 10, horizontal: 16),
-                    child: ListTile(
-                      title: Text(vendorName,
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: IconButton(
-                        icon: Icon(
-                          isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorite ? Colors.red : null,
-                        ),
-                        onPressed: () async {
-                          await _toggleFavorite(vendorId, isFavorite);
-                        },
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FarmhouseDetailsScreen(
-                              farmhouseId: vendorId,
-                              farmhouseData: data,
-                              timeSlots:
-                                  List<String>.from(data['timeslots'] ?? []),
+                    margin: const EdgeInsets.all(8),
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: 200,
+                          child: PageView.builder(
+                            itemCount: images.length,
+                            itemBuilder: (context, imgIndex) => Image.network(
+                              images[imgIndex],
+                              fit: BoxFit.cover,
                             ),
                           ),
-                        );
-                      },
+                        ),
+                        ListTile(
+                          title: Text(data['name'] ?? 'Unknown'),
+                          subtitle: Text(data['location'] ?? ''),
+                          trailing: IconButton(
+                            icon: Icon(
+                              favoriteSnapshot.data ?? false
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: favoriteSnapshot.data ?? false
+                                  ? Colors.red
+                                  : null,
+                            ),
+                            onPressed: () => _toggleFavorite(
+                                vendorId, favoriteSnapshot.data ?? false),
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => FarmhouseDetailingScreen(
+                                  farmhouseId: vendorId,
+                                  farmhouseData: data,
+                                  timeSlots: List<Map<String, dynamic>>.from(
+                                      data['timeSlots'] ?? []),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -125,6 +123,22 @@ class _farmhouseState extends State<farmhouse> {
           );
         },
       ),
+      bottomNavigationBar: _buildBottomNavBar(context, 0),
+    );
+  }
+
+  BottomNavigationBar _buildBottomNavBar(BuildContext context, int index) {
+    return BottomNavigationBar(
+      currentIndex: index,
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+        BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorites'),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+      ],
+      onTap: (idx) {
+        if (idx == 1) Navigator.pushNamed(context, '/favorites');
+        if (idx == 2) Navigator.pushNamed(context, '/profile');
+      },
     );
   }
 }

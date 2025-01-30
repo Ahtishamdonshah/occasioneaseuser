@@ -2,34 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:occasioneaseuser/Screens/availabilityfarm.dart';
-// Import AvailabilityPage
 
-class quantityanddateFarmhouseScreen extends StatefulWidget {
-  final List<Map<String, dynamic>> selectedRooms;
+class QuantityAndDateFarmhouseScreen extends StatefulWidget {
+  final List<Map<String, dynamic>> selectedServices;
   final String farmhouseId;
-  final List<String> timeSlots;
-  final List<double> roomPrices;
-  final double pricePerSeat; // Add this field to the constructor
+  final List<Map<String, dynamic>> timeSlots;
+  final double pricePerSeat;
+  final int numberOfPersons;
+  final Map<String, dynamic> farmhouseData;
 
-  const quantityanddateFarmhouseScreen({
+  const QuantityAndDateFarmhouseScreen({
     Key? key,
-    required this.selectedRooms,
+    required this.selectedServices,
     required this.farmhouseId,
     required this.timeSlots,
-    required this.roomPrices,
     required this.pricePerSeat,
-    required double farmhousePrice,
-    required List<Map<String, dynamic>>
-        selectedServices, // Pass the pricePerSeat here
+    required this.numberOfPersons,
+    required this.farmhouseData,
   }) : super(key: key);
 
   @override
-  _quantityanddateFarmhouseScreenState createState() =>
-      _quantityanddateFarmhouseScreenState();
+  _QuantityAndDateFarmhouseScreenState createState() =>
+      _QuantityAndDateFarmhouseScreenState();
 }
 
-class _quantityanddateFarmhouseScreenState
-    extends State<quantityanddateFarmhouseScreen> {
+class _QuantityAndDateFarmhouseScreenState
+    extends State<QuantityAndDateFarmhouseScreen> {
   final Map<String, int> _quantities = {};
   DateTime? _selectedDate;
   String? _selectedTimeSlot;
@@ -37,8 +35,8 @@ class _quantityanddateFarmhouseScreenState
   @override
   void initState() {
     super.initState();
-    for (var room in widget.selectedRooms) {
-      _quantities[room['name']] = 1;
+    for (var service in widget.selectedServices) {
+      _quantities[service['name']] = 1;
     }
   }
 
@@ -47,9 +45,8 @@ class _quantityanddateFarmhouseScreenState
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-
     if (pickedDate != null && pickedDate != _selectedDate) {
       setState(() {
         _selectedDate = pickedDate;
@@ -61,32 +58,34 @@ class _quantityanddateFarmhouseScreenState
   Future<void> _bookFarmhouse() async {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a date and time slot'),
-        ),
+        const SnackBar(content: Text('Please select date and time slot')),
       );
       return;
     }
 
     try {
-      // Add the booking details to Firestore
-      await FirebaseFirestore.instance.collection('FarmhouseBookings').add({
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+      final bookingRef =
+          FirebaseFirestore.instance.collection('FarmhouseBookings');
+
+      await bookingRef.add({
         'farmhouseId': widget.farmhouseId,
-        'date': DateFormat('yyyy-MM-dd').format(_selectedDate!),
+        'date': dateStr,
         'timeSlot': _selectedTimeSlot,
-        'rooms': widget.selectedRooms
-            .map((room) => {
-                  'name': room['name'],
-                  'quantity': _quantities[room['name']],
-                  'price': room['price']
+        'numberOfPersons': widget.numberOfPersons,
+        'services': widget.selectedServices
+            .map((service) => {
+                  'name': service['name'],
+                  'quantity': _quantities[service['name']],
+                  'price': service['price']
                 })
             .toList(),
         'status': 'Pending',
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Update the time slot as booked
-      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
-      final timeSlotDoc = await FirebaseFirestore.instance
+      // Update time slot availability
+      final slotQuery = await FirebaseFirestore.instance
           .collection('Farmhouses')
           .doc(widget.farmhouseId)
           .collection('timeSlots')
@@ -94,35 +93,27 @@ class _quantityanddateFarmhouseScreenState
           .where('startTime', isEqualTo: _selectedTimeSlot!.split(' - ')[0])
           .get();
 
-      if (timeSlotDoc.docs.isNotEmpty) {
-        await timeSlotDoc.docs.first.reference.update({'isBooked': true});
+      if (slotQuery.docs.isNotEmpty) {
+        await slotQuery.docs.first.reference.update({'isBooked': true});
       }
 
-      // Navigate to the AvailabilityPage with selected data
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => availabilityfarm(
-            selectedServices: widget.selectedRooms, // List of selected rooms
-            quantities: _quantities, // Map of room name to quantity
-            selectedDate: _selectedDate!, // Selected date
-            selectedTimeSlot: _selectedTimeSlot!, // Selected time slot
-            // services: widget.selectedRooms, // Same rooms as before
-            // date: _selectedDate!, // Same date as before
-            timeSlot: _selectedTimeSlot!, // Selected time slot
-            pricePerSeat: widget.pricePerSeat, // Pass pricePerSeat here
-            farmId: widget.farmhouseId, // Add the required farmId parameter
-            marriageHallId:
-                widget.farmhouseId, // Add the required marriageHallId parameter
+          builder: (context) => AvailabilityFarm(
+            selectedServices: widget.selectedServices,
+            quantities: _quantities,
+            selectedDate: _selectedDate!,
+            selectedTimeSlot: _selectedTimeSlot!,
+            pricePerSeat: widget.pricePerSeat,
+            numberOfPersons: widget.numberOfPersons,
+            farmhouseId: widget.farmhouseId,
           ),
         ),
       );
     } catch (e) {
-      print('Error booking farmhouse: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to book farmhouse'),
-        ),
+        const SnackBar(content: Text('Booking failed. Please try again.')),
       );
     }
   }
@@ -130,135 +121,93 @@ class _quantityanddateFarmhouseScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Farmhouse Booking Details"),
-      ),
+      appBar: AppBar(title: const Text("Booking Details")),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Price Per Seat and Total Cost
-              const SizedBox(height: 16),
-              Text(
-                'Price per Seat: \$${widget.pricePerSeat}',
-                style:
-                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const Text(
-                'Selected Rooms: ',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              ...widget.selectedRooms.map((room) {
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Price per Seat: \$${widget.pricePerSeat.toStringAsFixed(2)}'),
+            const SizedBox(height: 20),
+            const Text('Selected Services:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ...widget.selectedServices.map((service) => Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          room['name'],
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
+                        Text(service['name']),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Price: \$${room['price']}'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (_quantities[room['name']]! > 1) {
-                                        _quantities[room['name']] =
-                                            _quantities[room['name']]! - 1;
-                                      }
-                                    });
-                                  },
-                                ),
-                                Text('${_quantities[room['name']]}'),
-                                IconButton(
-                                  icon: const Icon(Icons.add),
-                                  onPressed: () {
-                                    setState(() {
-                                      _quantities[room['name']] =
-                                          _quantities[room['name']]! + 1;
-                                    });
-                                  },
-                                ),
-                              ],
+                            IconButton(
+                              icon: const Icon(Icons.remove),
+                              onPressed: () => setState(() {
+                                if (_quantities[service['name']]! > 1) {
+                                  _quantities[service['name']] =
+                                      _quantities[service['name']]! - 1;
+                                }
+                              }),
+                            ),
+                            Text('${_quantities[service['name']]}'),
+                            IconButton(
+                              icon: const Icon(Icons.add),
+                              onPressed: () => setState(() {
+                                _quantities[service['name']] =
+                                    _quantities[service['name']]! + 1;
+                              }),
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                );
-              }),
-              const SizedBox(height: 16),
-
-              // Date Selection
-              const Text(
-                'Select Date: ',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _selectDate,
-                      child: Text(_selectedDate == null
-                          ? 'Choose Date'
-                          : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Time Slot Selection
-              if (_selectedDate != null) ...[
-                const Text(
-                  'Select Time Slot: ',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  children: widget.timeSlots.map((slot) {
-                    return RadioListTile<String>(
-                      title: Text(slot),
-                      value: slot,
-                      groupValue: _selectedTimeSlot,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedTimeSlot = value;
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ],
-              const SizedBox(height: 16),
-
-              // Submit Button
-              const SizedBox(height: 16),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _bookFarmhouse,
-                  child: const Text('Book Now'),
-                ),
-              ),
+                )),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _selectDate,
+              child: Text(_selectedDate == null
+                  ? 'Select Date'
+                  : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
+            ),
+            if (_selectedDate != null) ...[
+              const SizedBox(height: 20),
+              const Text('Available Time Slots:',
+                  style: TextStyle(fontSize: 16)),
+              ...widget.timeSlots.map((slot) => RadioListTile<String>(
+                    title: Text('${slot['startTime']} - ${slot['endTime']}'),
+                    value: '${slot['startTime']} - ${slot['endTime']}',
+                    groupValue: _selectedTimeSlot,
+                    onChanged: (value) =>
+                        setState(() => _selectedTimeSlot = value),
+                  )),
             ],
-          ),
+            const SizedBox(height: 20),
+            Center(
+              child: ElevatedButton(
+                onPressed: _bookFarmhouse,
+                child: const Text('Confirm Booking'),
+              ),
+            ),
+          ],
         ),
       ),
+      bottomNavigationBar: _buildBottomNavBar(context, 0),
+    );
+  }
+
+  BottomNavigationBar _buildBottomNavBar(BuildContext context, int index) {
+    return BottomNavigationBar(
+      currentIndex: index,
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+        BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorites'),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+      ],
+      onTap: (idx) {
+        if (idx == 1) Navigator.pushNamed(context, '/favorites');
+        if (idx == 2) Navigator.pushNamed(context, '/profile');
+      },
     );
   }
 }

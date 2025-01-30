@@ -2,34 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
-class AvailabilityMarriageHall extends StatefulWidget {
-  final String hallId;
-  final List<String> timeSlots;
+class availabilitymarriagehall extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
   final Map<String, int> quantities;
   final DateTime selectedDate;
-  final String selectedTimeSlot;
-  final String userId;
+  final Map<String, dynamic> selectedTimeSlot;
+  final double pricePerSeat;
+  final int numberOfPersons;
+  final String marriageHallId;
+  final Map<String, dynamic> hallData;
 
-  const AvailabilityMarriageHall({
+  const availabilitymarriagehall({
     Key? key,
-    required this.hallId,
-    required this.timeSlots,
     required this.selectedServices,
     required this.quantities,
     required this.selectedDate,
     required this.selectedTimeSlot,
-    required this.userId,
+    required this.pricePerSeat,
+    required this.numberOfPersons,
+    required this.marriageHallId,
+    required this.hallData,
   }) : super(key: key);
 
   @override
-  _AvailabilityMarriageHallState createState() =>
-      _AvailabilityMarriageHallState();
+  _availabilitymarriagehallState createState() =>
+      _availabilitymarriagehallState();
 }
 
-class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
+class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
+  late double _totalPrice;
   bool _isAvailable = false;
-  double _totalPrice = 0.0;
 
   @override
   void initState() {
@@ -38,78 +40,65 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
   }
 
   void _calculateTotalPrice() {
-    double total = 0.0;
-    for (var service in widget.selectedServices) {
-      total += service['price'] * widget.quantities[service['name']]!;
-    }
-    setState(() {
-      _totalPrice = total;
+    double basePrice = widget.numberOfPersons * widget.pricePerSeat;
+    double servicesTotal = widget.selectedServices.fold(0.0, (sum, service) {
+      return sum + (service['price'] * widget.quantities[service['name']]!);
     });
+    _totalPrice = basePrice + servicesTotal;
   }
 
   Future<void> _checkAvailability() async {
     try {
-      final querySnapshot = await FirebaseFirestore.instance
+      final dateStr = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
+
+      final bookings = await FirebaseFirestore.instance
           .collection('MarriageHallBookings')
-          .where('hallId', isEqualTo: widget.hallId)
-          .where('date',
-              isEqualTo: DateFormat('yyyy-MM-dd').format(widget.selectedDate))
-          .where('timeSlot', isEqualTo: widget.selectedTimeSlot)
+          .where('marriageHallId', isEqualTo: widget.marriageHallId)
+          .where('date', isEqualTo: dateStr)
+          .where('timeSlot.startTime',
+              isEqualTo: widget.selectedTimeSlot['startTime'])
           .get();
 
       setState(() {
-        _isAvailable = querySnapshot.docs.isEmpty;
+        _isAvailable =
+            bookings.docs.length < widget.selectedTimeSlot['maxEvents'];
       });
+
+      if (_isAvailable) {
+        await FirebaseFirestore.instance
+            .collection('MarriageHallBookings')
+            .add({
+          'marriageHallId': widget.marriageHallId,
+          'date': dateStr,
+          'timeSlot': widget.selectedTimeSlot,
+          'services': widget.selectedServices
+              .map((service) => {
+                    'name': service['name'],
+                    'quantity': widget.quantities[service['name']],
+                    'price': service['price']
+                  })
+              .toList(),
+          'totalPrice': _totalPrice,
+          'numberOfPersons': widget.numberOfPersons,
+          'status': 'Booked',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_isAvailable
-              ? 'The selected slot is available'
-              : 'The selected slot is not available'),
+          content: Text(
+            _isAvailable
+                ? 'Slot is available and booked!'
+                : 'Slot is fully booked!',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: _isAvailable ? Colors.green : Colors.red,
         ),
       );
     } catch (e) {
-      print('Error checking availability: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to check availability')),
-      );
-    }
-  }
-
-  Future<void> _bookMarriageHall() async {
-    if (!_isAvailable) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Selected slot is not available')),
-      );
-      return;
-    }
-
-    try {
-      await FirebaseFirestore.instance.collection('MarriageHallBookings').add({
-        'userId': widget.userId,
-        'hallId': widget.hallId,
-        'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
-        'timeSlot': widget.selectedTimeSlot,
-        'services': widget.selectedServices
-            .map((service) => {
-                  'name': service['name'],
-                  'quantity': widget.quantities[service['name']],
-                  'price': service['price']
-                })
-            .toList(),
-        'totalPrice': _totalPrice,
-        'status': 'Pending',
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Marriage Hall Booked Successfully')),
-      );
-
-      // Navigate back or to another page if needed
-    } catch (e) {
-      print('Error booking marriage hall: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to book marriage hall')),
+        SnackBar(content: Text('Error checking availability')),
       );
     }
   }
@@ -118,78 +107,73 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Check Marriage Hall Availability"),
+        title:
+            Text('Availability Check', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.blueAccent,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Selected Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              ...widget.selectedServices.map((service) {
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          service['name'],
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text('Price: \$${service['price']}'),
-                        Text('Quantity: ${widget.quantities[service['name']]}'),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-              const SizedBox(height: 16),
-              const Text(
-                'Selected Date:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(DateFormat('yyyy-MM-dd').format(widget.selectedDate)),
-              const SizedBox(height: 16),
-              const Text(
-                'Selected Time Slot:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(widget.selectedTimeSlot),
-              const SizedBox(height: 16),
-              const Text(
-                'Total Price:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text('\$$_totalPrice'),
-              const SizedBox(height: 16),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _checkAvailability,
-                  child: const Text('Check Availability'),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Card(
+              color: Colors.blue.shade50,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Booking Summary',
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue)),
+                    Divider(),
+                    Text(
+                        'Date: ${DateFormat.yMd().format(widget.selectedDate)}',
+                        style: TextStyle(fontSize: 16)),
+                    Text(
+                        'Time: ${widget.selectedTimeSlot['startTime']} - ${widget.selectedTimeSlot['endTime']}',
+                        style: TextStyle(fontSize: 16)),
+                    Text('Persons: ${widget.numberOfPersons}',
+                        style: TextStyle(fontSize: 16)),
+                    Text(
+                        'Base Price: \$${(widget.numberOfPersons * widget.pricePerSeat).toStringAsFixed(2)}',
+                        style: TextStyle(fontSize: 16)),
+                    SizedBox(height: 10),
+                    ...widget.selectedServices.map((service) => ListTile(
+                          title: Text(service['name'],
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.blue.shade700)),
+                          trailing: Text(
+                              '\$${(service['price'] * widget.quantities[service['name']]!).toStringAsFixed(2)}',
+                              style: TextStyle(color: Colors.blue.shade900)),
+                          subtitle: Text(
+                              'Quantity: ${widget.quantities[service['name']]}'),
+                        )),
+                    Divider(),
+                    Text('Total Price: \$${_totalPrice.toStringAsFixed(2)}',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900)),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              if (_isAvailable)
-                Center(
-                  child: ElevatedButton(
-                    onPressed: _bookMarriageHall,
-                    child: const Text('Book Marriage Hall'),
-                  ),
-                ),
-            ],
-          ),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _checkAvailability,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blueAccent,
+                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              ),
+              child: Text('Check Availability',
+                  style: TextStyle(fontSize: 16, color: Colors.white)),
+            ),
+          ],
         ),
       ),
     );

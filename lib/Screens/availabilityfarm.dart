@@ -1,35 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
-class availabilityfarm extends StatefulWidget {
+class AvailabilityFarm extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
   final Map<String, int> quantities;
   final DateTime selectedDate;
   final String selectedTimeSlot;
-  final String farmId;
   final double pricePerSeat;
+  final int numberOfPersons;
+  final String farmhouseId;
 
-  const availabilityfarm({
+  const AvailabilityFarm({
     Key? key,
     required this.selectedServices,
     required this.quantities,
     required this.selectedDate,
     required this.selectedTimeSlot,
-    required this.farmId,
     required this.pricePerSeat,
-    required String timeSlot,
-    required String marriageHallId,
+    required this.numberOfPersons,
+    required this.farmhouseId,
   }) : super(key: key);
 
   @override
-  _availabilityfarmState createState() => _availabilityfarmState();
+  _AvailabilityFarmState createState() => _AvailabilityFarmState();
 }
 
-class _availabilityfarmState extends State<availabilityfarm> {
+class _AvailabilityFarmState extends State<AvailabilityFarm> {
+  bool _isAvailable = false;
   double _totalPrice = 0.0;
-  bool _isLoading = false;
 
   @override
   void initState() {
@@ -37,136 +36,112 @@ class _availabilityfarmState extends State<availabilityfarm> {
     _calculateTotalPrice();
   }
 
-  // Calculate total price based on selected services, quantities, and pricePerSeat
   void _calculateTotalPrice() {
-    double total = 0.0;
-    for (var service in widget.selectedServices) {
-      final price = service['price'] ?? 0.0;
-      final quantity = widget.quantities[service['name']] ?? 1;
-      total += price * quantity;
-    }
-    // Add pricePerSeat to the total price calculation
-    total += widget.pricePerSeat; // Simply add pricePerSeat
-    setState(() {
-      _totalPrice = total;
+    double basePrice = widget.numberOfPersons * widget.pricePerSeat;
+    double servicesPrice = widget.selectedServices.fold(0.0, (sum, service) {
+      return sum + (service['price'] * widget.quantities[service['name']]!);
     });
+    setState(() => _totalPrice = basePrice + servicesPrice);
   }
 
-  Future<void> _bookFarmService() async {
-    setState(() => _isLoading = true);
+  Future<void> _checkAvailability() async {
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
+      final query = await FirebaseFirestore.instance
+          .collection('FarmBookings')
+          .where('farmhouseId', isEqualTo: widget.farmhouseId)
+          .where('date',
+              isEqualTo: DateFormat('yyyy-MM-dd').format(widget.selectedDate))
+          .where('timeSlot', isEqualTo: widget.selectedTimeSlot)
+          .get();
+
+      setState(() => _isAvailable = query.docs.isEmpty);
+
+      if (_isAvailable) {
+        await FirebaseFirestore.instance.collection('FarmBookings').add({
+          'farmhouseId': widget.farmhouseId,
+          'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
+          'timeSlot': widget.selectedTimeSlot,
+          'numberOfPersons': widget.numberOfPersons,
+          'totalPrice': _totalPrice,
+          'services': widget.selectedServices
+              .map((service) => {
+                    'name': service['name'],
+                    'quantity': widget.quantities[service['name']],
+                    'price': service['price']
+                  })
+              .toList(),
+          'status': 'Confirmed',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not logged in')),
+          const SnackBar(
+              content: Text('Slot available and booked successfully!')),
         );
-        setState(() => _isLoading = false);
-        return;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Slot already booked')),
+        );
       }
-
-      await FirebaseFirestore.instance.collection('FarmBookings').add({
-        'userId': user.uid,
-        'farmId': widget.farmId,
-        'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
-        'timeSlot': widget.selectedTimeSlot,
-        'services': widget.selectedServices
-            .map((service) => {
-                  'name': service['name'],
-                  'quantity': widget.quantities[service['name']],
-                  'price': service['price']
-                })
-            .toList(),
-        'totalPrice': _totalPrice,
-        'status': 'Pending',
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Farm Service Booked Successfully')),
-      );
-
-      // Navigate back or to another page if needed
     } catch (e) {
-      print('Error booking farm service: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to book farm service')),
+        const SnackBar(content: Text('Error checking availability')),
       );
-    } finally {
-      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Check Farm Availability"),
-      ),
+      appBar: AppBar(title: const Text("Availability Check")),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Selected Farm Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Booking Summary:', style: TextStyle(fontSize: 20)),
+            const SizedBox(height: 20),
+            Text(
+                'Date: ${DateFormat('yyyy-MM-dd').format(widget.selectedDate)}'),
+            Text('Time Slot: ${widget.selectedTimeSlot}'),
+            Text('Number of Persons: ${widget.numberOfPersons}'),
+            const SizedBox(height: 20),
+            const Text('Services:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            ...widget.selectedServices.map((service) => ListTile(
+                  title: Text(service['name']),
+                  trailing: Text(
+                      '${widget.quantities[service['name']]} x \$${service['price']}'),
+                )),
+            const SizedBox(height: 20),
+            Text('Total Price: \$${_totalPrice.toStringAsFixed(2)}',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            Center(
+              child: ElevatedButton(
+                onPressed: _checkAvailability,
+                child: const Text('Check Availability'),
               ),
-              const SizedBox(height: 8),
-              ...widget.selectedServices.map((service) {
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          service['name'],
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text('Price: \$${service['price']}'),
-                        Text('Quantity: ${widget.quantities[service['name']]}'),
-                      ],
-                    ),
-                  ),
-                );
-              }).toList(),
-              const SizedBox(height: 16),
-              const Text(
-                'Selected Date:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(DateFormat('yyyy-MM-dd').format(widget.selectedDate)),
-              const SizedBox(height: 16),
-              const Text(
-                'Selected Time Slot:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text(widget.selectedTimeSlot),
-              const SizedBox(height: 16),
-              const Text(
-                'Total Price:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Text('\$$_totalPrice'),
-              const SizedBox(height: 16),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _bookFarmService,
-                  child: _isLoading
-                      ? const CircularProgressIndicator()
-                      : const Text('Book Farm Service'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+      bottomNavigationBar: _buildBottomNavBar(context, 0),
+    );
+  }
+
+  BottomNavigationBar _buildBottomNavBar(BuildContext context, int index) {
+    return BottomNavigationBar(
+      currentIndex: index,
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+        BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorites'),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+      ],
+      onTap: (idx) {
+        if (idx == 1) Navigator.pushNamed(context, '/favorites');
+        if (idx == 2) Navigator.pushNamed(context, '/profile');
+      },
     );
   }
 }

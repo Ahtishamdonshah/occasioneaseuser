@@ -329,11 +329,11 @@ class _home_screemState extends State<home_screem> {
         break;
       case 'FarmHouse':
         Navigator.push(
-            context, MaterialPageRoute(builder: (context) => farmhouse()));
+            context, MaterialPageRoute(builder: (context) => Farmhouse()));
         break;
       case 'Photographer':
         Navigator.push(
-            context, MaterialPageRoute(builder: (context) => photographer()));
+            context, MaterialPageRoute(builder: (context) => Photographer()));
         break;
       case 'Weather':
         Navigator.push(
@@ -345,7 +345,7 @@ class _home_screemState extends State<home_screem> {
         break;
       case 'Saloon':
         Navigator.push(
-            context, MaterialPageRoute(builder: (context) => Saloon()));
+            context, MaterialPageRoute(builder: (context) => Salon()));
         break;
       case 'Custom':
         Navigator.push(context,
