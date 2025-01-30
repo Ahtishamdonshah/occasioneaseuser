@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:occasioneaseuser/Screens/availabilityphotographer.dart';
 
 class QuantityPhotographer extends StatefulWidget {
   final List<Map<String, dynamic>> selectedSubservices;
@@ -87,46 +86,10 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
     setState(() => _availableCapacities = availableCapacities);
   }
 
-  Future<void> _bookAppointment() async {
-    if (_selectedDate == null || _selectedTimeSlot == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select date and time')));
-      return;
-    }
-
-    if ((_availableCapacities[_selectedTimeSlot!] ?? 0) <= 0) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Time slot unavailable')));
-      return;
-    }
-
-    try {
-      final totalPrice = widget.selectedSubservices.fold(0.0, (sum, service) {
-        return sum + (service['price'] * _quantities[service['name']]!);
-      });
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AvailabilityPhotographer(
-            selectedServices: widget.selectedSubservices,
-            quantities: _quantities,
-            selectedDate: _selectedDate!,
-            selectedTimeSlot: _selectedTimeSlot!,
-            photographerId: widget.photographerId,
-          ),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Booking failed')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Booking Details")),
+      appBar: AppBar(title: const Text("Photographer Details")),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -207,15 +170,6 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
                         );
                       }).toList(),
                     ),
-              Center(
-                child: ElevatedButton(
-                  onPressed: _selectedTimeSlot != null &&
-                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0
-                      ? _bookAppointment
-                      : null,
-                  child: const Text('Book Now'),
-                ),
-              ),
             ],
           ],
         ),
