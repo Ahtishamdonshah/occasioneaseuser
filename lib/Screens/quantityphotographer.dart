@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/availabilityphotographer.dart';
 
 class QuantityPhotographer extends StatefulWidget {
-  final List<Map<String, dynamic>> selectedServices;
-  final List<String> timeSlots;
+  final List<Map<String, dynamic>> selectedSubservices;
   final String photographerId;
+  final List<Map<String, dynamic>> timeSlots;
 
   const QuantityPhotographer({
     Key? key,
-    required this.selectedServices,
-    required this.timeSlots,
+    required this.selectedSubservices,
     required this.photographerId,
+    required this.timeSlots,
   }) : super(key: key);
 
   @override
@@ -24,11 +23,13 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
   final Map<String, int> _quantities = {};
   DateTime? _selectedDate;
   String? _selectedTimeSlot;
+  Map<String, int> _availableCapacities = {};
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    for (var service in widget.selectedServices) {
+    for (var service in widget.selectedSubservices) {
       _quantities[service['name']] = 1;
     }
   }
@@ -38,89 +39,111 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 30)),
+      lastDate: DateTime.now().add(Duration(days: 30)),
     );
 
     if (pickedDate != null && pickedDate != _selectedDate) {
       setState(() {
         _selectedDate = pickedDate;
         _selectedTimeSlot = null;
+        _isLoading = true;
       });
+      await _calculateAvailableCapacities(pickedDate);
+      setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _navigateToAvailabilityPhotography() async {
+  Future<void> _calculateAvailableCapacities(DateTime selectedDate) async {
+    final selectedDateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final bookingsQuery = await FirebaseFirestore.instance
+        .collection('PhotographerBookings')
+        .where('photographerId', isEqualTo: widget.photographerId)
+        .where('date', isEqualTo: selectedDateStr)
+        .get();
+
+    final Map<String, int> bookedQuantities = {};
+    for (var bookingDoc in bookingsQuery.docs) {
+      final bookingData = bookingDoc.data();
+      final timeSlot = bookingData['timeSlot'];
+      final services = bookingData['services'];
+      if (timeSlot == null || services == null) continue;
+
+      int totalQuantity =
+          services.fold(0, (sum, service) => sum + (service['quantity'] ?? 0));
+      bookedQuantities.update(timeSlot, (value) => value + totalQuantity,
+          ifAbsent: () => totalQuantity);
+    }
+
+    final Map<String, int> availableCapacities = {};
+    for (var timeSlot in widget.timeSlots) {
+      final startTime = timeSlot['startTime'] ?? '';
+      final endTime = timeSlot['endTime'] ?? '';
+      final capacity = timeSlot['capacity'] ?? 0;
+      final timeSlotString = '$startTime - $endTime';
+      availableCapacities[timeSlotString] =
+          capacity - (bookedQuantities[timeSlotString] ?? 0);
+    }
+
+    setState(() => _availableCapacities = availableCapacities);
+  }
+
+  Future<void> _bookAppointment() async {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a date and time slot'),
-        ),
-      );
+          const SnackBar(content: Text('Please select date and time')));
+      return;
+    }
+
+    if ((_availableCapacities[_selectedTimeSlot!] ?? 0) <= 0) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Time slot unavailable')));
       return;
     }
 
     try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not logged in')),
-        );
-        return;
-      }
+      final totalPrice = widget.selectedSubservices.fold(0.0, (sum, service) {
+        return sum + (service['price'] * _quantities[service['name']]!);
+      });
 
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => AvailabilityPhotography(
-            selectedServices: widget.selectedServices,
+          builder: (context) => AvailabilityPhotographer(
+            selectedServices: widget.selectedSubservices,
             quantities: _quantities,
             selectedDate: _selectedDate!,
             selectedTimeSlot: _selectedTimeSlot!,
-            userId: user.uid,
             photographerId: widget.photographerId,
           ),
         ),
       );
     } catch (e) {
-      print('Error navigating to availability photography: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Failed to navigate to availability photography')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Booking failed')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Photographer Booking Details"),
-      ),
+      appBar: AppBar(title: const Text("Booking Details")),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Selected Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              ...widget.selectedServices.map((service) {
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Selected Services:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ...widget.selectedSubservices.map((service) => Card(
+                  margin: EdgeInsets.symmetric(vertical: 8),
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          service['name'],
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
+                        Text(service['name'],
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -128,25 +151,20 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
                             Row(
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.remove),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (_quantities[service['name']]! > 1) {
-                                        _quantities[service['name']] =
-                                            _quantities[service['name']]! - 1;
-                                      }
-                                    });
-                                  },
+                                  icon: Icon(Icons.remove),
+                                  onPressed: () => setState(() {
+                                    if (_quantities[service['name']]! > 1) {
+                                      _quantities[service['name']] =
+                                          _quantities[service['name']]! - 1;
+                                    }
+                                  }),
                                 ),
                                 Text('${_quantities[service['name']]}'),
                                 IconButton(
-                                  icon: const Icon(Icons.add),
-                                  onPressed: () {
-                                    setState(() {
+                                  icon: Icon(Icons.add),
+                                  onPressed: () => setState(() =>
                                       _quantities[service['name']] =
-                                          _quantities[service['name']]! + 1;
-                                    });
-                                  },
+                                          _quantities[service['name']]! + 1),
                                 ),
                               ],
                             ),
@@ -155,57 +173,51 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
                       ],
                     ),
                   ),
-                );
-              }).toList(),
-              const SizedBox(height: 16),
-              const Text(
-                'Select Date:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _selectDate,
-                      child: Text(_selectedDate == null
-                          ? 'Choose Date'
-                          : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
+                )),
+            SizedBox(height: 16),
+            Text('Select Date:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ElevatedButton(
+              onPressed: _selectDate,
+              child: Text(_selectedDate == null
+                  ? 'Choose Date'
+                  : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
+            ),
+            if (_selectedDate != null) ...[
+              SizedBox(height: 16),
+              Text('Select Time Slot:',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              _isLoading
+                  ? CircularProgressIndicator()
+                  : Column(
+                      children: widget.timeSlots.map((timeSlot) {
+                        final startTime = timeSlot['startTime'] ?? '';
+                        final endTime = timeSlot['endTime'] ?? '';
+                        final timeSlotString = '$startTime - $endTime';
+                        final available =
+                            _availableCapacities[timeSlotString] ?? 0;
+                        return RadioListTile<String>(
+                          title: Text('$timeSlotString ($available available)'),
+                          value: timeSlotString,
+                          groupValue: _selectedTimeSlot,
+                          onChanged: available > 0
+                              ? (value) =>
+                                  setState(() => _selectedTimeSlot = value)
+                              : null,
+                        );
+                      }).toList(),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              if (_selectedDate != null) ...[
-                const Text(
-                  'Select Time Slot:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Column(
-                  children: widget.timeSlots.map((slot) {
-                    return RadioListTile<String>(
-                      title: Text(slot),
-                      value: slot,
-                      groupValue: _selectedTimeSlot,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedTimeSlot = value;
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-              ],
-              const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
-                  onPressed: _navigateToAvailabilityPhotography,
-                  child: const Text('Proceed to Availability Check'),
+                  onPressed: _selectedTimeSlot != null &&
+                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0
+                      ? _bookAppointment
+                      : null,
+                  child: const Text('Book Now'),
                 ),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );

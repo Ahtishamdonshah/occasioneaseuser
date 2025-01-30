@@ -1,31 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class AvailabilityPhotography extends StatefulWidget {
+class AvailabilityPhotographer extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
   final Map<String, int> quantities;
   final DateTime selectedDate;
   final String selectedTimeSlot;
-  final String userId;
   final String photographerId;
 
-  const AvailabilityPhotography({
+  const AvailabilityPhotographer({
     Key? key,
     required this.selectedServices,
     required this.quantities,
     required this.selectedDate,
     required this.selectedTimeSlot,
-    required this.userId,
     required this.photographerId,
   }) : super(key: key);
 
   @override
-  _AvailabilityPhotographyState createState() =>
-      _AvailabilityPhotographyState();
+  _AvailabilityPhotographerState createState() =>
+      _AvailabilityPhotographerState();
 }
 
-class _AvailabilityPhotographyState extends State<AvailabilityPhotography> {
+class _AvailabilityPhotographerState extends State<AvailabilityPhotographer> {
   double _totalPrice = 0.0;
 
   @override
@@ -37,17 +36,25 @@ class _AvailabilityPhotographyState extends State<AvailabilityPhotography> {
   void _calculateTotalPrice() {
     double total = 0.0;
     for (var service in widget.selectedServices) {
-      total += service['price'] * (widget.quantities[service['name']] ?? 0);
+      total += service['price'] * widget.quantities[service['name']]!;
     }
     setState(() {
       _totalPrice = total;
     });
   }
 
-  Future<void> _bookPhotographyService() async {
+  Future<void> _bookPhotographerService() async {
     try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not logged in')),
+        );
+        return;
+      }
+
       await FirebaseFirestore.instance.collection('PhotographerBookings').add({
-        'userId': widget.userId,
+        'userId': user.uid,
         'photographerId': widget.photographerId,
         'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
         'timeSlot': widget.selectedTimeSlot,
@@ -60,18 +67,17 @@ class _AvailabilityPhotographyState extends State<AvailabilityPhotography> {
             .toList(),
         'totalPrice': _totalPrice,
         'status': 'Pending',
+        'timestamp': FieldValue.serverTimestamp(),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Photography Service Booked Successfully')),
+            content: Text('Photographer service booked successfully!')),
       );
-
-      // Navigate back or to another page if needed
     } catch (e) {
-      print('Error booking photography service: $e');
+      print('Error booking photographer service: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to book photography service')),
+        const SnackBar(content: Text('Failed to book photographer service')),
       );
     }
   }
@@ -80,7 +86,7 @@ class _AvailabilityPhotographyState extends State<AvailabilityPhotography> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Check Photography Availability"),
+        title: const Text("Photographer Availability"),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -89,7 +95,7 @@ class _AvailabilityPhotographyState extends State<AvailabilityPhotography> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Selected Photography Services:',
+                'Selected Photographer Services:',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -138,8 +144,8 @@ class _AvailabilityPhotographyState extends State<AvailabilityPhotography> {
               const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
-                  onPressed: _bookPhotographyService,
-                  child: const Text('Book Photography Service'),
+                  onPressed: _bookPhotographerService,
+                  child: const Text('Book Photographer Service'),
                 ),
               ),
             ],

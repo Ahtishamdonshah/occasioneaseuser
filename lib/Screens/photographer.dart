@@ -3,46 +3,43 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/PhotographerDetailsScreen.dart';
 
-class photographer extends StatefulWidget {
-  const photographer({Key? key}) : super(key: key);
+class Photographer extends StatefulWidget {
+  const Photographer({Key? key}) : super(key: key);
 
   @override
-  _photographerState createState() => _photographerState();
+  _PhotographerState createState() => _PhotographerState();
 }
 
-class _photographerState extends State<photographer> {
+class _PhotographerState extends State<Photographer> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      final vendorFavoritesRef = FirebaseFirestore.instance
-          .collection('userFavorites')
-          .doc(user.uid)
-          .collection('vendors');
-      final userFavoritesRef = FirebaseFirestore.instance
+      final userFavoritesRef = _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors');
 
       if (isFavorite) {
-        //  await vendorFavoritesRef.doc(user.uid).delete();
         await userFavoritesRef.doc(vendorId).delete();
       } else {
-        // await vendorFavoritesRef.doc(user.uid).set({'userId': user.uid});
         await userFavoritesRef.doc(vendorId).set({'vendorId': vendorId});
       }
     }
   }
 
   Stream<bool> _isFavoriteStream(String vendorId) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      return FirebaseFirestore.instance
+      return _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors')
           .doc(vendorId)
           .snapshots()
-          .map((doc) => doc.exists);
+          .map((snapshot) => snapshot.exists);
     }
     return Stream.value(false);
   }
@@ -50,12 +47,9 @@ class _photographerState extends State<photographer> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Photographers"),
-      ),
+      appBar: AppBar(title: const Text("Photographers")),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance.collection('Photographer').snapshots(),
+        stream: _firestore.collection('Photographer').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -64,7 +58,7 @@ class _photographerState extends State<photographer> {
             return const Center(child: Text('Error fetching data'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No vendors found'));
+            return const Center(child: Text('No photographers found'));
           }
 
           return ListView.builder(
@@ -100,23 +94,20 @@ class _photographerState extends State<photographer> {
                           isFavorite ? Icons.favorite : Icons.favorite_border,
                           color: isFavorite ? Colors.red : null,
                         ),
-                        onPressed: () async {
-                          await _toggleFavorite(vendorId, isFavorite);
-                        },
+                        onPressed: () async =>
+                            await _toggleFavorite(vendorId, isFavorite),
                       ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => PhotographerDetailsScreen(
-                              photographerId: vendorId,
-                              photographerData: data,
-                              timeSlots:
-                                  List<String>.from(data['timeslots'] ?? []),
-                            ),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PhotographerDetailsScreen(
+                            photographerId: vendorId,
+                            photographerData: data,
+                            timeSlots: List<Map<String, dynamic>>.from(
+                                data['timeSlots'] ?? []),
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   );
                 },

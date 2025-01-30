@@ -4,13 +4,13 @@ import 'package:occasioneaseuser/Screens/quantityphotographer.dart';
 class PhotographerDetailsScreen extends StatefulWidget {
   final String photographerId;
   final Map<String, dynamic> photographerData;
-  final List<String> timeSlots;
+  final List<Map<String, dynamic>> timeSlots;
 
   const PhotographerDetailsScreen({
     Key? key,
     required this.photographerId,
     required this.photographerData,
-    required this.timeSlots, // Receiving timeSlots here
+    required this.timeSlots,
   }) : super(key: key);
 
   @override
@@ -45,9 +45,7 @@ class _PhotographerDetailsScreenState extends State<PhotographerDetailsScreen> {
     final String location = widget.photographerData['location'] ?? 'N/A';
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(name),
-      ),
+      appBar: AppBar(title: Text(name)),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,72 +56,50 @@ class _PhotographerDetailsScreenState extends State<PhotographerDetailsScreen> {
                 margin: const EdgeInsets.only(bottom: 16),
                 child: PageView(
                   children: images
-                      .map(
-                        (url) => Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Center(child: Text('Image not available')),
-                        ),
-                      )
+                      .map((url) => Image.network(url, fit: BoxFit.cover))
                       .toList(),
                 ),
               )
             else
               const Center(
                   child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text('No images available'),
-              )),
+                      padding: EdgeInsets.all(16.0),
+                      child: Text('No images available'))),
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(name,
-                      style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text('Location: $location',
-                      style: const TextStyle(fontSize: 16)),
-                  const SizedBox(height: 16),
-                  const Text('Services:',
+                      style:
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text('Location: $location', style: TextStyle(fontSize: 16)),
+                  SizedBox(height: 16),
+                  Text('Services:',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ..._servicesByCategory.entries.map((entry) {
-                    final category = entry.key;
-                    final services = entry.value;
-                    return ExpansionTile(
-                      title: Text(
-                        category,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      children: List.generate(services.length, (index) {
-                        final service = services[index];
-                        final String serviceName = service['name'] ?? 'N/A';
-                        final double price = (service['price'] ?? 0).toDouble();
-                        return CheckboxListTile(
-                          title: Text(serviceName),
-                          subtitle:
-                              Text('Price: \$${price.toStringAsFixed(2)}'),
-                          value: _selectedSubServices[category]![index],
-                          onChanged: (bool? value) {
-                            setState(() {
-                              _selectedSubServices[category]![index] =
-                                  value ?? false;
-                            });
-                          },
-                        );
-                      }),
-                    );
-                  }),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 8),
+                  ..._servicesByCategory.entries.map((entry) => ExpansionTile(
+                        title: Text(entry.key,
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        children: List.generate(entry.value.length, (index) {
+                          final service = entry.value[index];
+                          return CheckboxListTile(
+                            title: Text(service['name']),
+                            subtitle: Text('Price: \$${service['price']}'),
+                            value: _selectedSubServices[entry.key]![index],
+                            onChanged: (bool? value) => setState(() =>
+                                _selectedSubServices[entry.key]![index] =
+                                    value ?? false),
+                          );
+                        }),
+                      )),
+                  SizedBox(height: 16),
                   Center(
                     child: ElevatedButton(
                       onPressed: () {
                         final selectedServices = <Map<String, dynamic>>[];
-
                         _servicesByCategory.forEach((category, services) {
                           for (int i = 0; i < services.length; i++) {
                             if (_selectedSubServices[category]![i]) {
@@ -131,24 +107,21 @@ class _PhotographerDetailsScreenState extends State<PhotographerDetailsScreen> {
                             }
                           }
                         });
-
                         if (selectedServices.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content:
-                                  Text('Please select at least one service'),
-                            ),
+                                content:
+                                    Text('Please select at least one service')),
                           );
                           return;
                         }
-
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => QuantityPhotographer(
-                              selectedServices: selectedServices,
+                              selectedSubservices: selectedServices,
                               photographerId: widget.photographerId,
-                              timeSlots: widget.timeSlots, // Passing timeSlots
+                              timeSlots: widget.timeSlots,
                             ),
                           ),
                         );
