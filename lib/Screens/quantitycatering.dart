@@ -7,7 +7,7 @@ import 'availabilitycatering.dart';
 class QuantityCatering extends StatefulWidget {
   final List<Map<String, dynamic>> selectedSubservices;
   final String cateringId;
-  final List<String> timeSlots;
+  final List<Map<String, dynamic>> timeSlots;
 
   const QuantityCatering({
     Key? key,
@@ -25,6 +25,9 @@ class _QuantityCateringState extends State<QuantityCatering> {
   DateTime? _selectedDate;
   String? _selectedTimeSlot;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  Map<String, int> _availableCapacities = {};
+  bool _isLoading = false;
+  bool _isBooking = false; // Added booking state flag
 
   @override
   void initState() {
@@ -46,60 +49,120 @@ class _QuantityCateringState extends State<QuantityCatering> {
       setState(() {
         _selectedDate = pickedDate;
         _selectedTimeSlot = null;
+        _isLoading = true;
+      });
+
+      await _calculateAvailableCapacities(pickedDate);
+
+      setState(() {
+        _isLoading = false;
       });
     }
   }
 
-  Future<int> _getBookedCapacity(String date, String timeSlot) async {
-    try {
-      final bookings = await _firestore
-          .collection('CateringBookings')
-          .where('cateringId', isEqualTo: widget.cateringId)
-          .where('date', isEqualTo: date)
-          .where('timeSlot', isEqualTo: timeSlot)
-          .get();
+  Future<void> _calculateAvailableCapacities(DateTime selectedDate) async {
+    final selectedDateStr = DateFormat('yyyy-MM-dd').format(selectedDate);
+    final bookingsQuery = await _firestore
+        .collection('CateringBookings')
+        .where('cateringId', isEqualTo: widget.cateringId)
+        .where('date', isEqualTo: selectedDateStr)
+        .get();
 
-      int totalBooked = 0;
-      for (var booking in bookings.docs) {
-        totalBooked += (booking['totalQuantity'] ?? 0) as int;
+    final Map<String, int> bookedQuantities = {};
+
+    for (var bookingDoc in bookingsQuery.docs) {
+      final bookingData = bookingDoc.data() as Map<String, dynamic>;
+      final timeSlot = bookingData['timeSlot'] as String?;
+      final services = bookingData['services'] as List<dynamic>?;
+
+      if (timeSlot == null || services == null) continue;
+
+      int totalQuantity = 0;
+      for (var service in services) {
+        totalQuantity += (service['quantity'] as int?) ?? 0;
       }
-      return totalBooked;
-    } catch (e) {
-      print('Error fetching bookings: $e');
-      return 0;
+
+      bookedQuantities.update(
+        timeSlot,
+        (value) => value + totalQuantity,
+        ifAbsent: () => totalQuantity,
+      );
     }
+
+    final Map<String, int> availableCapacities = {};
+
+    for (var timeSlot in widget.timeSlots) {
+      final startTime = timeSlot['startTime'] as String? ?? '';
+      final endTime = timeSlot['endTime'] as String? ?? '';
+      final capacity = (timeSlot['capacity'] as int?) ?? 0;
+      final timeSlotString = '$startTime - $endTime';
+
+      final booked = bookedQuantities[timeSlotString] ?? 0;
+      final available = capacity - booked;
+
+      availableCapacities[timeSlotString] = available;
+    }
+
+    setState(() {
+      _availableCapacities = availableCapacities;
+    });
   }
 
-  void _navigateToAvailabilityCatering() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User not logged in')),
-      );
-      return;
-    }
+  Future<void> _bookAppointment() async {
+    if (_isBooking) return;
+    setState(() => _isBooking = true);
 
-    if (_selectedDate == null || _selectedTimeSlot == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a date and time slot')),
-      );
-      return;
-    }
+    try {
+      if (_selectedDate == null || _selectedTimeSlot == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a date and time slot')),
+        );
+        return;
+      }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AvailabilityCatering(
-          cateringId: widget.cateringId,
-          timeSlots: widget.timeSlots,
-          selectedSubservices: widget.selectedSubservices,
-          quantities: _quantities,
-          selectedDate: _selectedDate!,
-          selectedTimeSlot: _selectedTimeSlot!,
-          userId: user.uid,
+      final availableCapacity = _availableCapacities[_selectedTimeSlot!] ?? 0;
+      if (availableCapacity <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('This time slot is no longer available')),
+        );
+        return;
+      }
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not logged in')),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AvailabilityCatering(
+            cateringId: widget.cateringId,
+            timeSlots: widget.timeSlots
+                .map((slot) => '${slot['startTime']} - ${slot['endTime']}')
+                .toList(),
+            selectedSubservices: widget.selectedSubservices,
+            quantities: _quantities,
+            selectedDate: _selectedDate!,
+            selectedTimeSlot: _selectedTimeSlot!,
+            userId: user.uid,
+          ),
         ),
-      ),
-    );
+      ).then((_) => setState(() => _isBooking = false));
+    } catch (e) {
+      print('Error booking appointment: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to book appointment')),
+      );
+    } finally {
+      if (mounted && _isBooking) {
+        setState(() => _isBooking = false);
+      }
+    }
   }
 
   @override
@@ -194,43 +257,49 @@ class _QuantityCateringState extends State<QuantityCatering> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                FutureBuilder<List<Map<String, dynamic>>>(
-                  future: _getAvailableTimeSlots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const CircularProgressIndicator();
-                    }
-                    if (snapshot.hasError) {
-                      return Text('Error: ${snapshot.error}');
-                    }
-                    final availableSlots = snapshot.data ?? [];
-                    return Column(
-                      children: availableSlots.map((slot) {
-                        final isAvailable = slot['available'] as bool;
-                        return RadioListTile<String>(
-                          title: Text(
-                            '${slot['timeSlot']} ${isAvailable ? '' : '(Not Available)'}',
-                          ),
-                          value: slot['timeSlot'],
-                          groupValue: _selectedTimeSlot,
-                          onChanged: isAvailable
-                              ? (value) {
-                                  setState(() {
-                                    _selectedTimeSlot = value;
-                                  });
-                                }
-                              : null,
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : Column(
+                        children: widget.timeSlots.map((timeSlot) {
+                          final startTime =
+                              timeSlot['startTime'] as String? ?? '';
+                          final endTime = timeSlot['endTime'] as String? ?? '';
+                          final timeSlotString = '$startTime - $endTime';
+                          final availableCapacity =
+                              _availableCapacities[timeSlotString] ?? 0;
+                          final isAvailable = availableCapacity > 0;
+
+                          return RadioListTile<String>(
+                            title: Text(
+                                '$timeSlotString ($availableCapacity available)'),
+                            subtitle: !isAvailable
+                                ? const Text('Not available',
+                                    style: TextStyle(color: Colors.red))
+                                : null,
+                            value: timeSlotString,
+                            groupValue: _selectedTimeSlot,
+                            onChanged: isAvailable
+                                ? (value) {
+                                    setState(() {
+                                      _selectedTimeSlot = value;
+                                    });
+                                  }
+                                : null,
+                          );
+                        }).toList(),
+                      ),
               ],
               const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
-                  onPressed: _navigateToAvailabilityCatering,
-                  child: const Text('Proceed to Availability Check'),
+                  onPressed: (!_isBooking && // Added booking state check
+                          _selectedTimeSlot != null &&
+                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0)
+                      ? _bookAppointment
+                      : null,
+                  child: _isBooking
+                      ? const CircularProgressIndicator()
+                      : const Text('Book Now'),
                 ),
               ),
             ],
@@ -238,23 +307,5 @@ class _QuantityCateringState extends State<QuantityCatering> {
         ),
       ),
     );
-  }
-
-  Future<List<Map<String, dynamic>>> _getAvailableTimeSlots() async {
-    final List<Map<String, dynamic>> availableSlots = [];
-    final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
-
-    for (var slot in widget.timeSlots) {
-      final bookedCapacity = await _getBookedCapacity(dateStr, slot);
-      final totalCapacity = 2; // Replace with actual capacity from Firestore
-      final isAvailable = bookedCapacity < totalCapacity;
-
-      availableSlots.add({
-        'timeSlot': slot,
-        'available': isAvailable,
-      });
-    }
-
-    return availableSlots;
   }
 }

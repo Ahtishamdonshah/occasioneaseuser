@@ -122,7 +122,8 @@ class _SearchScreenState extends State<SearchScreen> {
             builder: (context) => CateringDetailsScreen(
               cateringId: vendorId,
               cateringData: vendorData,
-              timeSlots: timeslots,
+              timeSlots: vendorData[
+                  'timeSlots'], // Directly access timeSlots from catering data
             ),
           ),
         );

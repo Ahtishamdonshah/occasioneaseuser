@@ -11,38 +11,35 @@ class catering extends StatefulWidget {
 }
 
 class _cateringState extends State<catering> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      final vendorFavoritesRef = FirebaseFirestore.instance
-          .collection('userFavorites')
-          .doc(user.uid)
-          .collection('vendors');
-      final userFavoritesRef = FirebaseFirestore.instance
+      final userFavoritesRef = _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors');
 
       if (isFavorite) {
-        //   await vendorFavoritesRef.doc(user.uid).delete();
         await userFavoritesRef.doc(vendorId).delete();
       } else {
-        //  await vendorFavoritesRef.doc(user.uid).set({'userId': user.uid});
         await userFavoritesRef.doc(vendorId).set({'vendorId': vendorId});
       }
     }
   }
 
   Stream<bool> _isFavoriteStream(String vendorId) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      return FirebaseFirestore.instance
+      return _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors')
           .doc(vendorId)
           .snapshots()
-          .map((doc) => doc.exists);
+          .map((snapshot) => snapshot.exists);
     }
     return Stream.value(false);
   }
@@ -54,7 +51,7 @@ class _cateringState extends State<catering> {
         title: const Text("Catering Services"),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('Catering').snapshots(),
+        stream: _firestore.collection('Catering').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -110,8 +107,8 @@ class _cateringState extends State<catering> {
                             builder: (context) => CateringDetailsScreen(
                               cateringId: vendorId,
                               cateringData: data,
-                              timeSlots:
-                                  List<String>.from(data['timeslots'] ?? []),
+                              timeSlots: List<Map<String, dynamic>>.from(
+                                  data['timeSlots'] ?? []),
                             ),
                           ),
                         );

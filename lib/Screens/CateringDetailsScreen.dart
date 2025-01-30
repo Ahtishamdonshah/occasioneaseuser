@@ -4,7 +4,7 @@ import 'package:occasioneaseuser/Screens/quantitycatering.dart';
 class CateringDetailsScreen extends StatefulWidget {
   final String cateringId;
   final Map<String, dynamic> cateringData;
-  final List<String> timeSlots;
+  final List<Map<String, dynamic>> timeSlots;
 
   const CateringDetailsScreen({
     Key? key,
