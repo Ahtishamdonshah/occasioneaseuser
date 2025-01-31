@@ -47,7 +47,7 @@ class _QuantityAndDateMarriageHallState
       lastDate: DateTime.now().add(Duration(days: 365)),
     );
 
-    if (pickedDate != null) {
+    if (pickedDate != null && pickedDate != _selectedDate) {
       setState(() {
         _selectedDate = pickedDate;
         _selectedTimeSlot = null;
@@ -58,7 +58,7 @@ class _QuantityAndDateMarriageHallState
   void _proceedToBooking() {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Please select a date and time slot')),
+        SnackBar(content: Text('Please select date and time slot')),
       );
       return;
     }
@@ -66,7 +66,7 @@ class _QuantityAndDateMarriageHallState
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => availabilitymarriagehall(
+        builder: (context) => AvailabilityMarriageHall(
           selectedServices: widget.selectedServices,
           quantities: _quantities,
           selectedDate: _selectedDate!,
@@ -83,116 +83,138 @@ class _QuantityAndDateMarriageHallState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Booking Details'),
-        backgroundColor: Colors.blue.shade700,
-      ),
-      body: SingleChildScrollView(
+      appBar: AppBar(title: Text('Booking Details')),
+      body: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Number of Persons: ${widget.numberOfPersons}',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            _buildInfoTile(
+                'Number of Persons', widget.numberOfPersons.toString()),
             Divider(),
-
-            // Services with Quantity Selectors
-            Text('Selected Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 10),
-            ...widget.selectedServices.map((service) => Card(
-                  color: Colors.blue.shade50,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(service['name'],
-                                style: TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.bold)),
-                            Text('\$${service['price']} per unit',
-                                style: TextStyle(fontSize: 14)),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.remove, color: Colors.blue),
-                              onPressed: () => setState(() {
-                                if (_quantities[service['name']]! > 1) {
-                                  _quantities[service['name']] =
-                                      _quantities[service['name']]! - 1;
-                                }
-                              }),
-                            ),
-                            Text('${_quantities[service['name']]}',
-                                style: TextStyle(fontSize: 16)),
-                            IconButton(
-                              icon: Icon(Icons.add, color: Colors.blue),
-                              onPressed: () => setState(() {
-                                _quantities[service['name']] =
-                                    _quantities[service['name']]! + 1;
-                              }),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                )),
-
+            _buildServiceSelection(),
             SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _selectDate,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
-                padding: EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-              ),
-              child: Text(
-                _selectedDate == null
-                    ? 'Select Date'
-                    : 'Selected: ${DateFormat.yMd().format(_selectedDate!)}',
-                style: TextStyle(fontSize: 16),
-              ),
-            ),
-
-            if (_selectedDate != null) ...[
-              SizedBox(height: 20),
-              Text('Available Time Slots:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ...widget.timeSlots.map((slot) => Card(
-                    child: RadioListTile<Map<String, dynamic>>(
-                      title: Text('${slot['startTime']} - ${slot['endTime']}'),
-                      subtitle: Text('Max events: ${slot['maxEvents']}'),
-                      value: slot,
-                      groupValue: _selectedTimeSlot,
-                      onChanged: (value) =>
-                          setState(() => _selectedTimeSlot = value),
-                    ),
-                  )),
-            ],
-
+            _buildDatePicker(),
+            if (_selectedDate != null) _buildTimeSlots(),
             SizedBox(height: 30),
             Center(
               child: ElevatedButton(
                 onPressed: _proceedToBooking,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade700,
-                  padding: EdgeInsets.symmetric(vertical: 15, horizontal: 30),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  child: Text('Check Availability & Book'),
                 ),
-                child: Text('Check Availability & Book',
-                    style:
-                        TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
         ),
       ),
+      bottomNavigationBar: _buildBottomNavBar(context),
+    );
+  }
+
+  Widget _buildInfoTile(String title, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(value, style: TextStyle(fontSize: 16)),
+      ],
+    );
+  }
+
+  Widget _buildServiceSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Selected Services:', style: TextStyle(fontSize: 18)),
+        SizedBox(height: 10),
+        ...widget.selectedServices.map((service) => Card(
+              elevation: 3,
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(service['name'],
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('\$${service['price']} per unit',
+                            style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                    _buildQuantityControls(service['name']),
+                  ],
+                ),
+              ),
+            )),
+      ],
+    );
+  }
+
+  Widget _buildQuantityControls(String serviceName) {
+    return Row(
+      children: [
+        IconButton(
+          icon: Icon(Icons.remove_circle_outline),
+          onPressed: () => setState(() {
+            if (_quantities[serviceName]! > 1) {
+              _quantities[serviceName] = _quantities[serviceName]! - 1;
+            }
+          }),
+        ),
+        Text('${_quantities[serviceName]}',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        IconButton(
+          icon: Icon(Icons.add_circle_outline),
+          onPressed: () => setState(() {
+            _quantities[serviceName] = _quantities[serviceName]! + 1;
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePicker() {
+    return Center(
+      child: ElevatedButton(
+        onPressed: _selectDate,
+        child: Text(_selectedDate == null
+            ? 'Select Date'
+            : 'Selected: ${DateFormat.yMd().format(_selectedDate!)}'),
+      ),
+    );
+  }
+
+  Widget _buildTimeSlots() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 20),
+        Text('Available Time Slots:', style: TextStyle(fontSize: 18)),
+        ...widget.timeSlots.map((slot) => RadioListTile<Map<String, dynamic>>(
+              title: Text('${slot['startTime']} - ${slot['endTime']}'),
+              value: slot,
+              groupValue: _selectedTimeSlot,
+              onChanged: (value) => setState(() => _selectedTimeSlot = value),
+            )),
+      ],
+    );
+  }
+
+  Widget _buildBottomNavBar(BuildContext context) {
+    return BottomNavigationBar(
+      currentIndex: 0,
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+        BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorites'),
+        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+      ],
+      onTap: (idx) =>
+          Navigator.pushNamed(context, idx == 1 ? '/favorites' : '/profile'),
     );
   }
 }

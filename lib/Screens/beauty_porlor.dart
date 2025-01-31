@@ -3,14 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/ParlorDetailsScreen.dart';
 
-class beauty_porlor extends StatefulWidget {
-  const beauty_porlor({Key? key}) : super(key: key);
+class BeautyParlor extends StatefulWidget {
+  const BeautyParlor({Key? key}) : super(key: key);
 
   @override
-  _beauty_porlorState createState() => _beauty_porlorState();
+  _BeautyParlorState createState() => _BeautyParlorState();
 }
 
-class _beauty_porlorState extends State<beauty_porlor> {
+class _BeautyParlorState extends State<BeautyParlor> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 

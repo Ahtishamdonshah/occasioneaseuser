@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:occasioneaseuser/Screens/availabilityphotographer.dart';
 
 class QuantityPhotographer extends StatefulWidget {
   final List<Map<String, dynamic>> selectedSubservices;
@@ -60,17 +61,13 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
         .where('date', isEqualTo: selectedDateStr)
         .get();
 
-    final Map<String, int> bookedQuantities = {};
+    final Map<String, int> bookedSlots = {};
     for (var bookingDoc in bookingsQuery.docs) {
       final bookingData = bookingDoc.data();
       final timeSlot = bookingData['timeSlot'];
-      final services = bookingData['services'];
-      if (timeSlot == null || services == null) continue;
-
-      int totalQuantity =
-          services.fold(0, (sum, service) => sum + (service['quantity'] ?? 0));
-      bookedQuantities.update(timeSlot, (value) => value + totalQuantity,
-          ifAbsent: () => totalQuantity);
+      if (timeSlot != null) {
+        bookedSlots.update(timeSlot, (value) => value + 1, ifAbsent: () => 1);
+      }
     }
 
     final Map<String, int> availableCapacities = {};
@@ -80,16 +77,46 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
       final capacity = timeSlot['capacity'] ?? 0;
       final timeSlotString = '$startTime - $endTime';
       availableCapacities[timeSlotString] =
-          capacity - (bookedQuantities[timeSlotString] ?? 0);
+          capacity - (bookedSlots[timeSlotString] ?? 0);
     }
 
     setState(() => _availableCapacities = availableCapacities);
   }
 
+  Future<void> _bookAppointment() async {
+    if (_selectedDate == null || _selectedTimeSlot == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select date and time')),
+      );
+      return;
+    }
+
+    if ((_availableCapacities[_selectedTimeSlot!] ?? 0) <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Time slot unavailable')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AvailabilityPhotographer(
+          selectedServices: widget.selectedSubservices,
+          quantities: _quantities,
+          selectedDate: _selectedDate!,
+          selectedTimeSlot: _selectedTimeSlot!,
+          photographerId: widget.photographerId,
+          timeSlots: widget.timeSlots,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Photographer Details")),
+      appBar: AppBar(title: const Text("Booking Details")),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
@@ -170,6 +197,15 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
                         );
                       }).toList(),
                     ),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _selectedTimeSlot != null &&
+                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0
+                      ? _bookAppointment
+                      : null,
+                  child: const Text('Book Now'),
+                ),
+              ),
             ],
           ],
         ),

@@ -72,7 +72,7 @@ class _RegistrationpageState extends State<Registrationpage> {
           context,
           MaterialPageRoute(
               builder: (context) =>
-                  login_screen()), // Make sure your login screen import is correct
+                  LoginScreen()), // Make sure your login screen import is correct
           (Route<dynamic> route) => false, // Removes all previous routes
         );
       } on FirebaseAuthException catch (e) {
@@ -231,7 +231,7 @@ class _RegistrationpageState extends State<Registrationpage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (context) => login_screen()),
+                              builder: (context) => LoginScreen()),
                         );
                       },
                       child: Text(

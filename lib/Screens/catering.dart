@@ -3,14 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/CateringDetailsScreen.dart';
 
-class catering extends StatefulWidget {
-  const catering({Key? key}) : super(key: key);
+class Catering extends StatefulWidget {
+  const Catering({Key? key}) : super(key: key);
 
   @override
-  _cateringState createState() => _cateringState();
+  _CateringState createState() => _CateringState();
 }
 
-class _cateringState extends State<catering> {
+class _CateringState extends State<Catering> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 

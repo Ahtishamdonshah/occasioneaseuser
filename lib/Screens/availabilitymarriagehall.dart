@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
-class availabilitymarriagehall extends StatefulWidget {
+class AvailabilityMarriageHall extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
   final Map<String, int> quantities;
   final DateTime selectedDate;
@@ -12,7 +13,7 @@ class availabilitymarriagehall extends StatefulWidget {
   final String marriageHallId;
   final Map<String, dynamic> hallData;
 
-  const availabilitymarriagehall({
+  const AvailabilityMarriageHall({
     Key? key,
     required this.selectedServices,
     required this.quantities,
@@ -25,13 +26,14 @@ class availabilitymarriagehall extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _availabilitymarriagehallState createState() =>
-      _availabilitymarriagehallState();
+  _AvailabilityMarriageHallState createState() =>
+      _AvailabilityMarriageHallState();
 }
 
-class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
+class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
   late double _totalPrice;
   bool _isAvailable = false;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -49,6 +51,17 @@ class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
 
   Future<void> _checkAvailability() async {
     try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('User not authenticated. Please login.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       final dateStr = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
 
       final bookings = await FirebaseFirestore.instance
@@ -68,6 +81,7 @@ class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
         await FirebaseFirestore.instance
             .collection('MarriageHallBookings')
             .add({
+          'userId': user.uid, // Add current user ID
           'marriageHallId': widget.marriageHallId,
           'date': dateStr,
           'timeSlot': widget.selectedTimeSlot,
@@ -91,14 +105,14 @@ class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
             _isAvailable
                 ? 'Slot is available and booked!'
                 : 'Slot is fully booked!',
-            style: TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.white),
           ),
           backgroundColor: _isAvailable ? Colors.green : Colors.red,
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error checking availability')),
+        const SnackBar(content: Text('Error checking availability')),
       );
     }
   }
@@ -107,12 +121,12 @@ class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title:
-            Text('Availability Check', style: TextStyle(color: Colors.white)),
+        title: const Text('Availability Check',
+            style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blueAccent,
       ),
       body: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             Card(
@@ -120,28 +134,28 @@ class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Booking Summary',
+                    const Text('Booking Summary',
                         style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.blue)),
-                    Divider(),
+                    const Divider(),
                     Text(
                         'Date: ${DateFormat.yMd().format(widget.selectedDate)}',
-                        style: TextStyle(fontSize: 16)),
+                        style: const TextStyle(fontSize: 16)),
                     Text(
                         'Time: ${widget.selectedTimeSlot['startTime']} - ${widget.selectedTimeSlot['endTime']}',
-                        style: TextStyle(fontSize: 16)),
+                        style: const TextStyle(fontSize: 16)),
                     Text('Persons: ${widget.numberOfPersons}',
-                        style: TextStyle(fontSize: 16)),
+                        style: const TextStyle(fontSize: 16)),
                     Text(
                         'Base Price: \$${(widget.numberOfPersons * widget.pricePerSeat).toStringAsFixed(2)}',
-                        style: TextStyle(fontSize: 16)),
-                    SizedBox(height: 10),
+                        style: const TextStyle(fontSize: 16)),
+                    const SizedBox(height: 10),
                     ...widget.selectedServices.map((service) => ListTile(
                           title: Text(service['name'],
                               style: TextStyle(
@@ -153,7 +167,7 @@ class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
                           subtitle: Text(
                               'Quantity: ${widget.quantities[service['name']]}'),
                         )),
-                    Divider(),
+                    const Divider(),
                     Text('Total Price: \$${_totalPrice.toStringAsFixed(2)}',
                         style: TextStyle(
                             fontSize: 18,
@@ -163,14 +177,15 @@ class _availabilitymarriagehallState extends State<availabilitymarriagehall> {
                 ),
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _checkAvailability,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.blueAccent,
-                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
               ),
-              child: Text('Check Availability',
+              child: const Text('Check Availability',
                   style: TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ],

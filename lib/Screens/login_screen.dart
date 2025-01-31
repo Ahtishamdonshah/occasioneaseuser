@@ -4,12 +4,12 @@ import 'package:occasioneaseuser/Screens/Registerationpage.dart';
 import 'package:occasioneaseuser/Screens/home_screem.dart';
 // Add your home screen
 
-class login_screen extends StatefulWidget {
+class LoginScreen extends StatefulWidget {
   @override
-  _login_screenState createState() => _login_screenState();
+  _LoginScreenState createState() => _LoginScreenState();
 }
 
-class _login_screenState extends State<login_screen> {
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -44,7 +44,7 @@ class _login_screenState extends State<login_screen> {
         // Navigate to home screen
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => home_screem()),
+          MaterialPageRoute(builder: (context) => HomeScreen()),
         );
       } on FirebaseAuthException catch (e) {
         setState(() {
