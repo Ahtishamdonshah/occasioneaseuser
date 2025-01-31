@@ -278,20 +278,19 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
+      drawer: _buildDrawer(), // Drawer is still functional
       appBar: AppBar(
-        title: const Text('OCCASSIONEASE',
-            style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 20)),
+        title: const Text(
+          'OCCASSIONEASE',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
         backgroundColor: Colors.blue[700],
-        automaticallyImplyLeading: false,
-        //  leading: IconButton(
-        //  icon: const Icon(Icons.camera_alt, color: Colors.white, size: 30),
-        // onPressed: _pickImage,
-        //  ),
+        automaticallyImplyLeading: true, // Keeps drawer icon in AppBar
       ),
-      drawer: _buildDrawer(),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -300,6 +299,8 @@ class _HomeScreenState extends State<HomeScreen> {
             snap: true,
             backgroundColor: Colors.blue[700],
             expandedHeight: 60,
+            automaticallyImplyLeading:
+                false, // Removes drawer icon from search bar
             flexibleSpace: GestureDetector(
               onTap: () => Navigator.push(
                 context,

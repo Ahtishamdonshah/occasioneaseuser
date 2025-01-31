@@ -63,11 +63,17 @@ class _SearchScreenState extends State<SearchScreen> {
           }
 
           if (nameField.contains(vendorName)) {
+            double? rating =
+                (data.containsKey('rating') && data['rating'] != null)
+                    ? data['rating'].toDouble()
+                    : null; // Null if rating does not exist
+
             setState(() {
               searchResults.add({
                 'id': doc.id,
                 'category': category,
                 'data': data,
+                'rating': rating,
               });
             });
           }
@@ -80,94 +86,6 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         isSearching = false;
       });
-    }
-  }
-
-  Future<void> _navigateToDetailsScreen(Map<String, dynamic> vendor) async {
-    String category = vendor['category'];
-    String vendorId = vendor['id'];
-    Map<String, dynamic> vendorData = vendor['data'];
-    List<String> timeslots = List<String>.from(vendorData['timeslots'] ?? []);
-    final List<Map<String, dynamic>> timeSlots =
-        List<Map<String, dynamic>>.from(vendorData['timeSlots'] ?? []);
-    switch (category) {
-      case 'Beauty Parlors':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ParlorDetailsScreen(
-              parlorId: vendorId,
-              parlorData: vendorData,
-              timeSlots: timeSlots,
-            ),
-          ),
-        );
-        break;
-      case 'Saloons':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SalonDetailsScreen(
-              salonId: vendorId,
-              salonData: vendorData,
-              timeSlots: vendorData['timeSlots'],
-            ),
-          ),
-        );
-        break;
-      case 'Catering':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => CateringDetailsScreen(
-              cateringId: vendorId,
-              cateringData: vendorData,
-              timeSlots: vendorData[
-                  'timeSlots'], // Directly access timeSlots from catering data
-            ),
-          ),
-        );
-        break;
-      case 'Photographer':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PhotographerDetailsScreen(
-              photographerId: vendorId,
-              photographerData: vendorData,
-              timeSlots: vendorData['timeSlots'],
-            ),
-          ),
-        );
-        break;
-      case 'Farm Houses':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => FarmhouseDetailingScreen(
-              farmhouseId: vendorId,
-              farmhouseData: vendorData,
-              timeSlots: vendorData['timeSlots'],
-            ),
-          ),
-        );
-        break;
-      case 'Marriage Halls':
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MarriageHallDetailingScreen(
-              hallId: vendorId,
-              hallData: vendorData,
-              timeSlots: vendorData['timeSlots'],
-            ),
-          ),
-        );
-        break;
-      default:
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unknown category: $category')),
-        );
     }
   }
 
@@ -215,6 +133,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               final result = searchResults[index];
                               final category = result['category'];
                               final data = result['data'];
+                              final rating = result['rating']; // Get rating
 
                               String displayName;
                               switch (category) {
@@ -242,9 +161,28 @@ class _SearchScreenState extends State<SearchScreen> {
                                     const EdgeInsets.symmetric(vertical: 10),
                                 child: ListTile(
                                   title: Text(displayName,
-                                      style: TextStyle(
+                                      style: const TextStyle(
                                           fontWeight: FontWeight.bold)),
-                                  subtitle: Text('Category: $category'),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text('Category: $category'),
+                                      Row(
+                                        children: List.generate(5, (index) {
+                                          return Icon(
+                                            Icons.star,
+                                            color: rating != null &&
+                                                    index < rating.round()
+                                                ? Colors.yellow
+                                                : Colors.grey,
+                                            size: 18,
+                                          );
+                                        }),
+                                      ),
+                                      const SizedBox(width: 5),
+                                    ],
+                                  ),
                                   onTap: () => _navigateToDetailsScreen(result),
                                 ),
                               );
@@ -255,5 +193,89 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _navigateToDetailsScreen(Map<String, dynamic> vendor) async {
+    String category = vendor['category'];
+    String vendorId = vendor['id'];
+    Map<String, dynamic> vendorData = vendor['data'];
+    List<String> timeslots = List<String>.from(vendorData['timeslots'] ?? []);
+    final List<Map<String, dynamic>> timeSlots =
+        List<Map<String, dynamic>>.from(vendorData['timeSlots'] ?? []);
+
+    switch (category) {
+      case 'Beauty Parlors':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ParlorDetailsScreen(
+              parlorId: vendorId,
+              parlorData: vendorData,
+              timeSlots: timeSlots,
+            ),
+          ),
+        );
+        break;
+      case 'Saloons':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => SalonDetailsScreen(
+              salonId: vendorId,
+              salonData: vendorData,
+              timeSlots: vendorData['timeSlots'],
+            ),
+          ),
+        );
+        break;
+      case 'Catering':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => CateringDetailsScreen(
+              cateringId: vendorId,
+              cateringData: vendorData,
+              timeSlots: vendorData['timeSlots'],
+            ),
+          ),
+        );
+        break;
+      case 'Photographer':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PhotographerDetailsScreen(
+              photographerId: vendorId,
+              photographerData: vendorData,
+              timeSlots: vendorData['timeSlots'],
+            ),
+          ),
+        );
+        break;
+      case 'Farm Houses':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FarmhouseDetailingScreen(
+              farmhouseId: vendorId,
+              farmhouseData: vendorData,
+              timeSlots: vendorData['timeSlots'],
+            ),
+          ),
+        );
+        break;
+      case 'Marriage Halls':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MarriageHallDetailingScreen(
+              hallId: vendorId,
+              hallData: vendorData,
+              timeSlots: vendorData['timeSlots'],
+            ),
+          ),
+        );
+        break;
+    }
   }
 }
