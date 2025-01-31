@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import 'package:occasioneaseuser/Screens/FarmhouseDetailsScreen.dart';
 
 class Farmhouse extends StatefulWidget {
@@ -12,10 +11,25 @@ class Farmhouse extends StatefulWidget {
 }
 
 class _FarmhouseState extends State<Farmhouse> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Function to build the rating stars UI
+  Widget _buildRatingStars(double rating) {
+    List<Widget> stars = [];
+    for (int i = 0; i < 5; i++) {
+      stars.add(Icon(
+        i < rating ? Icons.star : Icons.star_border,
+        color: i < rating ? Colors.yellow : Colors.grey,
+      ));
+    }
+    return Row(children: stars);
+  }
+
   Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      final userFavoritesRef = FirebaseFirestore.instance
+      final userFavoritesRef = _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors');
@@ -29,9 +43,9 @@ class _FarmhouseState extends State<Farmhouse> {
   }
 
   Stream<bool> _isFavoriteStream(String vendorId) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      return FirebaseFirestore.instance
+      return _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors')
@@ -42,21 +56,36 @@ class _FarmhouseState extends State<Farmhouse> {
     return Stream.value(false);
   }
 
+  // Fetch farmhouse's rating from the 'rating' collection
+  Future<double> _getFarmhouseRating(String vendorId) async {
+    final ratingSnapshot =
+        await _firestore.collection('rating').doc(vendorId).get();
+
+    if (ratingSnapshot.exists) {
+      final ratingData = ratingSnapshot.data() as Map<String, dynamic>;
+      return ratingData['rating']?.toDouble() ??
+          0.0; // Return rating or 0 if not found
+    }
+    return 0.0;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Farmhouses")),
+      appBar: AppBar(
+        title: const Text("Farmhouses"),
+      ),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance.collection('Farm Houses').snapshots(),
+        stream: _firestore.collection('Farm Houses').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError)
+          if (snapshot.hasError) {
             return const Center(child: Text('Error fetching data'));
+          }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No farmhouses found'));
+            return const Center(child: Text('No vendors found'));
           }
 
           return ListView.builder(
@@ -65,40 +94,67 @@ class _FarmhouseState extends State<Farmhouse> {
               final doc = snapshot.data!.docs[index];
               final data = doc.data() as Map<String, dynamic>;
               final vendorId = doc.id;
-              final images = List<String>.from(data['imageUrls'] ?? []);
+              final vendorName = data['name'] ?? 'Unknown';
 
-              return StreamBuilder<bool>(
-                stream: _isFavoriteStream(vendorId),
-                builder: (context, favoriteSnapshot) {
-                  return Card(
-                    elevation: 4,
-                    margin: const EdgeInsets.all(8),
-                    child: Column(
-                      children: [
-                        SizedBox(
-                          height: 200,
-                          child: PageView.builder(
-                            itemCount: images.length,
-                            itemBuilder: (context, imgIndex) => Image.network(
-                              images[imgIndex],
-                              fit: BoxFit.cover,
-                            ),
+              return FutureBuilder<double>(
+                future: _getFarmhouseRating(vendorId),
+                builder: (context, ratingSnapshot) {
+                  if (ratingSnapshot.connectionState ==
+                      ConnectionState.waiting) {
+                    return ListTile(
+                      title: Text(vendorName),
+                      trailing: const CircularProgressIndicator(),
+                    );
+                  }
+                  if (ratingSnapshot.hasError) {
+                    return ListTile(
+                      title: Text(vendorName),
+                      subtitle: const Text('Error fetching rating'),
+                    );
+                  }
+
+                  final vendorRating = ratingSnapshot.data ?? 0.0;
+
+                  return StreamBuilder<bool>(
+                    stream: _isFavoriteStream(vendorId),
+                    builder: (context, favoriteSnapshot) {
+                      if (favoriteSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return ListTile(
+                          title: Text(vendorName),
+                          trailing: const CircularProgressIndicator(),
+                        );
+                      }
+
+                      bool isFavorite = favoriteSnapshot.data ?? false;
+
+                      return Card(
+                        elevation: 4,
+                        margin: const EdgeInsets.symmetric(
+                            vertical: 10, horizontal: 16),
+                        child: ListTile(
+                          title: Text(
+                            vendorName,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                        ),
-                        ListTile(
-                          title: Text(data['name'] ?? 'Unknown'),
-                          subtitle: Text(data['location'] ?? ''),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(data['location'] ?? ''),
+                              _buildRatingStars(
+                                  vendorRating), // Display rating stars
+                            ],
+                          ),
                           trailing: IconButton(
                             icon: Icon(
-                              favoriteSnapshot.data ?? false
+                              isFavorite
                                   ? Icons.favorite
                                   : Icons.favorite_border,
-                              color: favoriteSnapshot.data ?? false
-                                  ? Colors.red
-                                  : null,
+                              color: isFavorite ? Colors.red : null,
                             ),
-                            onPressed: () => _toggleFavorite(
-                                vendorId, favoriteSnapshot.data ?? false),
+                            onPressed: () async {
+                              await _toggleFavorite(vendorId, isFavorite);
+                            },
                           ),
                           onTap: () {
                             Navigator.push(
@@ -114,8 +170,8 @@ class _FarmhouseState extends State<Farmhouse> {
                             );
                           },
                         ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               );
@@ -123,22 +179,6 @@ class _FarmhouseState extends State<Farmhouse> {
           );
         },
       ),
-      bottomNavigationBar: _buildBottomNavBar(context, 0),
-    );
-  }
-
-  BottomNavigationBar _buildBottomNavBar(BuildContext context, int index) {
-    return BottomNavigationBar(
-      currentIndex: index,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-        BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorites'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-      ],
-      onTap: (idx) {
-        if (idx == 1) Navigator.pushNamed(context, '/favorites');
-        if (idx == 2) Navigator.pushNamed(context, '/profile');
-      },
     );
   }
 }

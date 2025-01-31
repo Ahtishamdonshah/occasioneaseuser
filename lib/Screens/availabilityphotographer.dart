@@ -94,8 +94,7 @@ class _AvailabilityPhotographerState extends State<AvailabilityPhotographer> {
                 })
             .toList(),
         'totalPrice': _totalPrice,
-        'status': 'Pending',
-        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'BOOKED',
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

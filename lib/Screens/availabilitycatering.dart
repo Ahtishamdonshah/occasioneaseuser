@@ -65,7 +65,7 @@ class _AvailabilityCateringState extends State<AvailabilityCatering> {
                 })
             .toList(),
         'totalPrice': _totalPrice,
-        'status': 'Pending',
+        'status': 'BOOKED',
         'createdAt': FieldValue.serverTimestamp(), // Add server timestamp
       };
 

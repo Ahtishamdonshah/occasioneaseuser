@@ -11,32 +11,41 @@ class MarriageHall extends StatefulWidget {
 }
 
 class _MarriageHallState extends State<MarriageHall> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Function to build the rating stars UI
+  Widget _buildRatingStars(double rating) {
+    List<Widget> stars = [];
+    for (int i = 0; i < 5; i++) {
+      stars.add(Icon(
+        i < rating ? Icons.star : Icons.star_border,
+        color: i < rating ? Colors.yellow : Colors.grey,
+      ));
+    }
+    return Row(children: stars);
+  }
+
   Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      final vendorFavoritesRef = FirebaseFirestore.instance
-          .collection('userFavorites')
-          .doc(user.uid)
-          .collection('vendors');
-      final userFavoritesRef = FirebaseFirestore.instance
+      final userFavoritesRef = _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors');
 
       if (isFavorite) {
-        //   await vendorFavoritesRef.doc(user.uid).delete();
         await userFavoritesRef.doc(vendorId).delete();
       } else {
-        //   await vendorFavoritesRef.doc(user.uid).set({'userId': user.uid});
         await userFavoritesRef.doc(vendorId).set({'vendorId': vendorId});
       }
     }
   }
 
   Stream<bool> _isFavoriteStream(String vendorId) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     if (user != null) {
-      return FirebaseFirestore.instance
+      return _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors')
@@ -47,6 +56,19 @@ class _MarriageHallState extends State<MarriageHall> {
     return Stream.value(false);
   }
 
+  // Fetch marriage hall's rating from the 'rating' collection
+  Future<double> _getHallRating(String vendorId) async {
+    final ratingSnapshot =
+        await _firestore.collection('rating').doc(vendorId).get();
+
+    if (ratingSnapshot.exists) {
+      final ratingData = ratingSnapshot.data() as Map<String, dynamic>;
+      return ratingData['rating']?.toDouble() ??
+          0.0; // Return rating or 0 if not found
+    }
+    return 0.0;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,8 +76,7 @@ class _MarriageHallState extends State<MarriageHall> {
         title: const Text("Marriage Halls"),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream:
-            FirebaseFirestore.instance.collection('Marriage Halls').snapshots(),
+        stream: _firestore.collection('Marriage Halls').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -75,49 +96,80 @@ class _MarriageHallState extends State<MarriageHall> {
               final vendorId = doc.id;
               final vendorName = data['name'] ?? 'Unknown';
 
-              return StreamBuilder<bool>(
-                stream: _isFavoriteStream(vendorId),
-                builder: (context, favoriteSnapshot) {
-                  if (favoriteSnapshot.connectionState ==
+              return FutureBuilder<double>(
+                future: _getHallRating(vendorId),
+                builder: (context, ratingSnapshot) {
+                  if (ratingSnapshot.connectionState ==
                       ConnectionState.waiting) {
                     return ListTile(
                       title: Text(vendorName),
                       trailing: const CircularProgressIndicator(),
                     );
                   }
+                  if (ratingSnapshot.hasError) {
+                    return ListTile(
+                      title: Text(vendorName),
+                      subtitle: const Text('Error fetching rating'),
+                    );
+                  }
 
-                  bool isFavorite = favoriteSnapshot.data ?? false;
+                  final vendorRating = ratingSnapshot.data ?? 0.0;
 
-                  return Card(
-                    elevation: 4,
-                    margin: const EdgeInsets.symmetric(
-                        vertical: 10, horizontal: 16),
-                    child: ListTile(
-                      title: Text(vendorName,
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      trailing: IconButton(
-                        icon: Icon(
-                          isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorite ? Colors.red : null,
-                        ),
-                        onPressed: () async {
-                          await _toggleFavorite(vendorId, isFavorite);
-                        },
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => MarriageHallDetailingScreen(
-                              hallId: vendorId,
-                              hallData: data,
-                              timeSlots: List<Map<String, dynamic>>.from(
-                                  data['timeSlots'] ?? []),
-                            ),
-                          ),
+                  return StreamBuilder<bool>(
+                    stream: _isFavoriteStream(vendorId),
+                    builder: (context, favoriteSnapshot) {
+                      if (favoriteSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return ListTile(
+                          title: Text(vendorName),
+                          trailing: const CircularProgressIndicator(),
                         );
-                      },
-                    ),
+                      }
+
+                      bool isFavorite = favoriteSnapshot.data ?? false;
+
+                      return Card(
+                        elevation: 4,
+                        margin: const EdgeInsets.symmetric(
+                            vertical: 10, horizontal: 16),
+                        child: ListTile(
+                          title: Text(vendorName,
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildRatingStars(
+                                  vendorRating), // Display rating stars
+                            ],
+                          ),
+                          trailing: IconButton(
+                            icon: Icon(
+                              isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: isFavorite ? Colors.red : null,
+                            ),
+                            onPressed: () async {
+                              await _toggleFavorite(vendorId, isFavorite);
+                            },
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    MarriageHallDetailingScreen(
+                                  hallId: vendorId,
+                                  hallData: data,
+                                  timeSlots: List<Map<String, dynamic>>.from(
+                                      data['timeSlots'] ?? []),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
                   );
                 },
               );

@@ -75,7 +75,7 @@ class _availabilityState extends State<availability> {
                 })
             .toList(),
         'totalPrice': _totalPrice,
-        'status': 'Pending',
+        'status': 'BOOKED',
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

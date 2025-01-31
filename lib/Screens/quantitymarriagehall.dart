@@ -50,7 +50,7 @@ class _QuantityAndDateMarriageHallState
     if (pickedDate != null && pickedDate != _selectedDate) {
       setState(() {
         _selectedDate = pickedDate;
-        _selectedTimeSlot = null;
+        _selectedTimeSlot = null; // Reset time slot when the date changes
       });
     }
   }
@@ -84,7 +84,7 @@ class _QuantityAndDateMarriageHallState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Booking Details')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -52,7 +52,7 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
   Future<void> _checkAvailability() async {
     try {
       final user = _auth.currentUser;
-      if (user == null) {
+      if (user == null || user.uid.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('User not authenticated. Please login.'),
@@ -81,7 +81,7 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
         await FirebaseFirestore.instance
             .collection('MarriageHallBookings')
             .add({
-          'userId': user.uid, // Add current user ID
+          'userId': user.uid, // Ensure the user ID is included correctly
           'marriageHallId': widget.marriageHallId,
           'date': dateStr,
           'timeSlot': widget.selectedTimeSlot,
@@ -94,25 +94,26 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
               .toList(),
           'totalPrice': _totalPrice,
           'numberOfPersons': widget.numberOfPersons,
-          'status': 'Booked',
-          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'BOOKED',
         });
-      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            _isAvailable
-                ? 'Slot is available and booked!'
-                : 'Slot is fully booked!',
-            style: const TextStyle(color: Colors.white),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Slot is available and booked!'),
+            backgroundColor: Colors.green,
           ),
-          backgroundColor: _isAvailable ? Colors.green : Colors.red,
-        ),
-      );
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Slot is fully booked!'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error checking availability')),
+        SnackBar(content: Text('Error checking availability: $e')),
       );
     }
   }

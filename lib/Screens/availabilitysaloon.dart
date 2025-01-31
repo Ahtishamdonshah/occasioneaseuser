@@ -65,8 +65,7 @@ class _AvailabilitySaloonState extends State<AvailabilitySaloon> {
                 })
             .toList(),
         'totalPrice': _totalPrice,
-        'status': 'Pending',
-        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'BOOKED',
       });
 
       ScaffoldMessenger.of(context).showSnackBar(

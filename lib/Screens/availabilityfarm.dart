@@ -102,8 +102,7 @@ class _AvailabilityFarmState extends State<AvailabilityFarm> {
           'price': price
         };
       }).toList(),
-      'status': 'Confirmed',
-      'timestamp': FieldValue.serverTimestamp(),
+      'status': 'BOOKED',
     });
   }
 

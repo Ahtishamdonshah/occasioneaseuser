@@ -147,8 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: Colors.blue)),
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                  builder: (context) => const HistoryBookingPage()),
+              MaterialPageRoute(builder: (context) => BookingHistoryScreen()),
             ),
           ),
           const Divider(),

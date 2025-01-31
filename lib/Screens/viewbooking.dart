@@ -16,7 +16,7 @@ class BookingsScreen extends StatelessWidget {
       'SaloonBookings',
       'PhotographerBookings',
       'CateringBookings',
-      'FarmhouseBookings',
+      'FarmBookings',
       'MarriageHallBookings'
     ];
 
@@ -45,26 +45,14 @@ class BookingsScreen extends StatelessWidget {
     return null;
   }
 
-  bool _isUpcomingBooking(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>?;
-    if (data == null) return false;
-
-    final bookingDate = _getBookingDate(data);
-    if (bookingDate == null) return false;
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    return bookingDate.isAfter(today.subtract(const Duration(seconds: 1)));
-  }
-
   Map<String, List<QueryDocumentSnapshot>> groupBookingsByDate(
       List<QueryDocumentSnapshot> bookings) {
     final grouped = <String, List<QueryDocumentSnapshot>>{};
     for (final doc in bookings) {
-      final data = doc.data() as Map<String, dynamic>?;
-      if (data == null) continue;
+      final data = doc.data();
+      if (data == null || data is! Map) continue;
 
-      final bookingDate = _getBookingDate(data);
+      final bookingDate = _getBookingDate(Map<String, dynamic>.from(data));
       if (bookingDate == null) continue;
 
       final dateKey = dateFormat.format(bookingDate);
@@ -77,7 +65,7 @@ class BookingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Upcoming Bookings'),
+        title: const Text('Bookings'),
         backgroundColor: Colors.blue[800],
         foregroundColor: Colors.white,
       ),
@@ -99,21 +87,22 @@ class BookingsScreen extends StatelessWidget {
 
           final allBookings = snapshot.data!
               .expand((qs) => qs.docs.cast<QueryDocumentSnapshot>())
-              .where((doc) => _isUpcomingBooking(doc))
               .toList();
 
           if (allBookings.isEmpty) {
             return const Center(
               child: Text(
-                'No upcoming bookings found',
+                'No bookings available',
                 style: TextStyle(color: Colors.blueGrey),
               ),
             );
           }
 
           allBookings.sort((a, b) {
-            final aDate = _getBookingDate(a.data() as Map<String, dynamic>);
-            final bDate = _getBookingDate(b.data() as Map<String, dynamic>);
+            final aDate =
+                _getBookingDate(Map<String, dynamic>.from(a.data() as Map));
+            final bDate =
+                _getBookingDate(Map<String, dynamic>.from(b.data() as Map));
             return (aDate ?? DateTime.now()).compareTo(bDate ?? DateTime.now());
           });
 
@@ -132,7 +121,7 @@ class BookingsScreen extends StatelessWidget {
                 children: [
                   _buildDateHeader(dateKey),
                   ...bookings.map((doc) => _buildBookingCard(
-                        doc.data() as Map<String, dynamic>,
+                        Map<String, dynamic>.from(doc.data() as Map),
                         doc.reference.parent.id,
                       )),
                 ],
@@ -181,10 +170,14 @@ class BookingsScreen extends StatelessWidget {
               _buildBookingHeader(collectionName, booking['status']),
               const SizedBox(height: 12),
               _buildDetailRow('Date', displayDateFormat.format(bookingDate)),
-              if (booking['timeSlot'] != null)
-                _buildDetailRow('Time Slot', booking['timeSlot']),
-              _buildTotalPrice(booking['totalPrice']),
-              _buildServiceList(booking['services']),
+              _buildTimeSlot(booking, collectionName),
+              _buildTotalPrice(
+                  booking['totalPrice'] ?? booking['calculatedTotal']),
+              _buildServiceList(
+                collectionName == 'MarriageHallBookings'
+                    ? booking['additionalServices']
+                    : booking['services'],
+              ),
             ],
           ),
         ),
@@ -192,8 +185,24 @@ class BookingsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildTimeSlot(Map<String, dynamic> booking, String collectionName) {
+    dynamic timeSlot = booking['timeSlot'] ?? booking['selectedTimeSlot'];
+
+    if (timeSlot == null) return const SizedBox.shrink();
+
+    if (timeSlot is Map) {
+      final start = timeSlot['startTime'] ?? '';
+      final end = timeSlot['endTime'] ?? '';
+      return _buildDetailRow('Time Slot', '$start - $end');
+    }
+
+    return _buildDetailRow('Time Slot', timeSlot.toString());
+  }
+
   Widget _buildBookingHeader(String collectionName, String? status) {
-    final categoryName = collectionName.replaceAll('Bookings', '');
+    final categoryName = collectionName
+        .replaceAll('Bookings', '')
+        .replaceAll(RegExp(r'(?<=[a-z])[A-Z]'), r' $&');
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -217,34 +226,40 @@ class BookingsScreen extends StatelessWidget {
   }
 
   Widget _buildServiceList(dynamic services) {
-    if (services == null || !(services is List)) return const SizedBox.shrink();
+    if (services == null || services is! List) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
         const Text('Services:', style: TextStyle(fontWeight: FontWeight.bold)),
-        ...List<Widget>.from(services.map((service) => Padding(
+        ...services.map<Widget>((service) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child:
-                        Text(service['name']?.toString() ?? 'Unknown Service'),
+                    child: Text(
+                      service['name']?.toString() ?? 'Unknown Service',
+                      style: TextStyle(color: Colors.blue[800]),
+                    ),
                   ),
-                  Text('${service['quantity']} x ₹${service['price']}')
+                  Text(
+                    '${service['quantity'] ?? 1} x ₹${service['price']?.toStringAsFixed(2) ?? '0.00'}',
+                    style: TextStyle(color: Colors.blue[800]),
+                  )
                 ],
               ),
-            ))),
+            )),
       ],
     );
   }
 
   Widget _buildTotalPrice(dynamic totalPrice) {
+    final price = (totalPrice is num ? totalPrice : 0).toDouble();
     return _buildDetailRow(
       'Total Price',
-      '₹${(totalPrice is num ? totalPrice.toStringAsFixed(2) : '0.00')}',
+      '₹${price.toStringAsFixed(2)}',
       isTotal: true,
     );
   }
@@ -255,21 +270,15 @@ class BookingsScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.blue[800],
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.blue[800],
-              fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-              fontSize: isTotal ? 16 : 14,
-            ),
-          ),
+          Text(label,
+              style: TextStyle(
+                  color: Colors.blue[800],
+                  fontWeight: isTotal ? FontWeight.bold : FontWeight.normal)),
+          Text(value,
+              style: TextStyle(
+                  color: Colors.blue[800],
+                  fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                  fontSize: isTotal ? 16 : 14)),
         ],
       ),
     );
@@ -278,7 +287,6 @@ class BookingsScreen extends StatelessWidget {
   Color _getStatusColor(String? status) {
     switch (status?.toLowerCase()) {
       case 'confirmed':
-      case 'booked':
         return Colors.green[100]!;
       case 'cancelled':
         return Colors.red[100]!;

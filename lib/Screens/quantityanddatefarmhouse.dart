@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -64,12 +65,20 @@ class _QuantityAndDateFarmhouseScreenState
     }
 
     try {
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not authenticated')),
+        );
+        return;
+      }
+
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
-      final bookingRef =
-          FirebaseFirestore.instance.collection('FarmhouseBookings');
+      final bookingRef = FirebaseFirestore.instance.collection('FarmBookings');
 
       await bookingRef.add({
         'farmhouseId': widget.farmhouseId,
+        'userId': user.uid, // Use the current user ID
         'date': dateStr,
         'timeSlot': _selectedTimeSlot,
         'numberOfPersons': widget.numberOfPersons,
