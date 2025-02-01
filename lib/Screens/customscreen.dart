@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:math';
 
 class ComboDealsSelector extends StatefulWidget {
   const ComboDealsSelector({Key? key}) : super(key: key);
@@ -21,6 +22,55 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
   final List<String> _selectedServices = [];
   List<Map<String, dynamic>> _comboDeal = [];
   bool _isLoading = false;
+  final Random _random = Random();
+
+  int _getVendorPrice(String category, QueryDocumentSnapshot vendor) {
+    try {
+      switch (category) {
+        case 'Marriage Halls':
+        case 'Farm Houses':
+          final pricePerSeat = vendor['pricePerSeat'] as int;
+          final minCapacity = vendor['minCapacity'] as int;
+          return pricePerSeat * minCapacity;
+        case 'Beauty Parlors':
+        case 'Saloons':
+        case 'Photographer':
+          final services = vendor['services'] as List<dynamic>;
+          if (services.isEmpty) return 0;
+          return services
+              .map<int>((s) => (s as Map<String, dynamic>)['price'] as int)
+              .reduce((a, b) => a < b ? a : b);
+        case 'Catering':
+          return 0;
+        default:
+          return 0;
+      }
+    } catch (e) {
+      print('Error calculating price: $e');
+      return 0;
+    }
+  }
+
+  String _getVendorName(String category, QueryDocumentSnapshot vendor) {
+    switch (category) {
+      case 'Marriage Halls':
+      case 'Farm Houses':
+        return vendor['name'] as String;
+      case 'Beauty Parlors':
+      case 'Saloons':
+        return vendor['parlorName'] as String;
+      case 'Photographer':
+        return vendor['photographerName'] as String;
+      case 'Catering':
+        return vendor['cateringCompanyName'] as String;
+      default:
+        return 'Unknown Vendor';
+    }
+  }
+
+  String _getVendorDetails(String category, QueryDocumentSnapshot vendor) {
+    return vendor['description'] as String? ?? 'No details available';
+  }
 
   Future<void> _fetchComboDeals() async {
     final int? totalBudget = int.tryParse(_budgetController.text);
@@ -35,42 +85,40 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
 
     setState(() {
       _isLoading = true;
+      _comboDeal = [];
     });
 
     try {
       List<Map<String, dynamic>> fetchedVendors = [];
       int remainingBudget = totalBudget;
-      int budgetPerService = totalBudget ~/ _selectedServices.length;
 
       for (String service in _selectedServices) {
-        // Query for vendors with prices close to the allocated budget
-        final QuerySnapshot snapshot = await FirebaseFirestore.instance
-            .collection(service)
-            .orderBy('price')
-            .startAt([budgetPerService * 0.8]).endAt(
-                [budgetPerService * 1.2]).get();
+        final QuerySnapshot snapshot =
+            await FirebaseFirestore.instance.collection(service).get();
 
-        if (snapshot.docs.isNotEmpty) {
-          // Find the vendor with the closest price to budgetPerService
-          var closestVendor = snapshot.docs.reduce((a, b) {
-            int priceA = a['price'] as int;
-            int priceB = b['price'] as int;
-            return (priceA - budgetPerService).abs() <
-                    (priceB - budgetPerService).abs()
-                ? a
-                : b;
+        if (snapshot.docs.isEmpty) continue;
+
+        List<QueryDocumentSnapshot> eligibleVendors = [];
+        for (var doc in snapshot.docs) {
+          final vendorPrice = _getVendorPrice(service, doc);
+          if (vendorPrice > 0 && vendorPrice <= remainingBudget) {
+            eligibleVendors.add(doc);
+          }
+        }
+
+        if (eligibleVendors.isNotEmpty) {
+          final selectedVendor =
+              eligibleVendors[_random.nextInt(eligibleVendors.length)];
+          final vendorPrice = _getVendorPrice(service, selectedVendor);
+
+          fetchedVendors.add({
+            'service': service,
+            'name': _getVendorName(service, selectedVendor),
+            'price': vendorPrice,
+            'details': _getVendorDetails(service, selectedVendor),
           });
 
-          final price = closestVendor['price'] as int;
-          if (price <= remainingBudget) {
-            fetchedVendors.add({
-              'service': service,
-              'name': closestVendor['name'],
-              'price': price,
-              'details': closestVendor['details'],
-            });
-            remainingBudget -= price;
-          }
+          remainingBudget -= vendorPrice;
         }
       }
 
@@ -160,7 +208,7 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Best Combo Deal:',
+                    'Your Budgeting Vendors Package:',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
@@ -182,8 +230,8 @@ class _ComboDealsSelectorState extends State<ComboDealsSelector> {
                         fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   if (_comboDeal.length < _selectedServices.length)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
                       child: Text(
                         'Note: Some services could not be added due to budget constraints.',
                         style: TextStyle(

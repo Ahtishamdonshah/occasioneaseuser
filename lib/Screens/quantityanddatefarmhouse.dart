@@ -1,8 +1,7 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:occasioneaseuser/Screens/availabilityfarm.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:occasioneaseuser/Screens/availabilityfarm.dart'; // Adjusted import
 
 class QuantityAndDateFarmhouseScreen extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
@@ -29,194 +28,277 @@ class QuantityAndDateFarmhouseScreen extends StatefulWidget {
 
 class _QuantityAndDateFarmhouseScreenState
     extends State<QuantityAndDateFarmhouseScreen> {
-  final Map<String, int> _quantities = {};
+  late Map<String, int> _quantities;
   DateTime? _selectedDate;
-  String? _selectedTimeSlot;
+  Map<String, dynamic>? _selectedTimeSlot;
+  List<String> _bookedSlotIds = [];
 
   @override
   void initState() {
     super.initState();
-    for (var service in widget.selectedServices) {
-      _quantities[service['name']] = 1;
+    _quantities = {
+      for (var service in widget.selectedServices) service['name']: 1
+    };
+  }
+
+  Future<void> _fetchBookedSlots(DateTime date) async {
+    try {
+      final formattedDate = DateFormat('yyyy-MM-dd').format(date);
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('FarmBookings') // Adjusted collection name
+          .where('farmhouseId', isEqualTo: widget.farmhouseId)
+          .where('date', isEqualTo: formattedDate)
+          .get();
+
+      List<String> bookedSlotIds = [];
+      for (var doc in querySnapshot.docs) {
+        bookedSlotIds.add(doc['timeSlot'] as String);
+      }
+
+      setState(() {
+        _bookedSlotIds = bookedSlotIds;
+      });
+    } catch (e) {
+      print('Error fetching booked slots: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking availability')),
+      );
     }
   }
 
   void _selectDate() async {
-    final DateTime? pickedDate = await showDatePicker(
+    final pickedDate = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime.now().add(Duration(days: 365)),
     );
+
     if (pickedDate != null && pickedDate != _selectedDate) {
       setState(() {
         _selectedDate = pickedDate;
         _selectedTimeSlot = null;
       });
+      await _fetchBookedSlots(pickedDate);
     }
   }
 
-  Future<void> _bookFarmhouse() async {
+  Future<bool> _checkAvailability(
+      DateTime date, Map<String, dynamic> timeSlot) async {
+    try {
+      final formattedDate = DateFormat('yyyy-MM-dd').format(date);
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('FarmBookings') // Adjusted collection name
+          .where('farmhouseId', isEqualTo: widget.farmhouseId)
+          .where('date', isEqualTo: formattedDate)
+          .where('timeSlot', isEqualTo: timeSlot['id'])
+          .get();
+
+      return querySnapshot.docs.isEmpty;
+    } catch (e) {
+      print('Error checking availability: $e');
+      return false;
+    }
+  }
+
+  void _proceedToBooking() async {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select date and time slot')),
+        SnackBar(content: Text('Please select date and time slot')),
       );
       return;
     }
 
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('User not authenticated')),
-        );
-        return;
-      }
-
-      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate!);
-      final bookingRef = FirebaseFirestore.instance.collection('FarmBookings');
-
-      await bookingRef.add({
-        'farmhouseId': widget.farmhouseId,
-        'userId': user.uid, // Use the current user ID
-        'date': dateStr,
-        'timeSlot': _selectedTimeSlot,
-        'numberOfPersons': widget.numberOfPersons,
-        'services': widget.selectedServices
-            .map((service) => {
-                  'name': service['name'],
-                  'quantity': _quantities[service['name']],
-                  'price': service['price']
-                })
-            .toList(),
-        'status': 'Pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      // Update time slot availability
-      final slotQuery = await FirebaseFirestore.instance
-          .collection('Farmhouses')
-          .doc(widget.farmhouseId)
-          .collection('timeSlots')
-          .where('date', isEqualTo: dateStr)
-          .where('startTime', isEqualTo: _selectedTimeSlot!.split(' - ')[0])
-          .get();
-
-      if (slotQuery.docs.isNotEmpty) {
-        await slotQuery.docs.first.reference.update({'isBooked': true});
-      }
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => AvailabilityFarm(
-            selectedServices: widget.selectedServices,
-            quantities: _quantities,
-            selectedDate: _selectedDate!,
-            selectedTimeSlot: _selectedTimeSlot!,
-            pricePerSeat: widget.pricePerSeat,
-            numberOfPersons: widget.numberOfPersons,
-            farmhouseId: widget.farmhouseId,
-          ),
+    bool isAvailable =
+        await _checkAvailability(_selectedDate!, _selectedTimeSlot!);
+    if (!isAvailable) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Slot Booked'),
+          content: Text('This slot is already booked. Please choose another.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('OK'),
+            ),
+          ],
         ),
       );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Booking failed. Please try again.')),
-      );
+      return;
     }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => availabilityfarm(
+          // Adjusted screen name
+          selectedServices: widget.selectedServices,
+          quantities: _quantities,
+          selectedDate: _selectedDate!,
+          selectedTimeSlot: _selectedTimeSlot!,
+          pricePerSeat: widget.pricePerSeat,
+          numberOfPersons: widget.numberOfPersons,
+          farmhouseId: widget.farmhouseId,
+          farmhouseData: widget.farmhouseData, // Ensure data is passed properly
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Booking Details")),
+      appBar: AppBar(title: Text('Booking Details')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Price per Seat: \$${widget.pricePerSeat.toStringAsFixed(2)}'),
-            const SizedBox(height: 20),
-            const Text('Selected Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ...widget.selectedServices.map((service) => Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(service['name']),
-                        Row(
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: () => setState(() {
-                                if (_quantities[service['name']]! > 1) {
-                                  _quantities[service['name']] =
-                                      _quantities[service['name']]! - 1;
-                                }
-                              }),
-                            ),
-                            Text('${_quantities[service['name']]}'),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () => setState(() {
-                                _quantities[service['name']] =
-                                    _quantities[service['name']]! + 1;
-                              }),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                )),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _selectDate,
-              child: Text(_selectedDate == null
-                  ? 'Select Date'
-                  : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
-            ),
-            if (_selectedDate != null) ...[
-              const SizedBox(height: 20),
-              const Text('Available Time Slots:',
-                  style: TextStyle(fontSize: 16)),
-              ...widget.timeSlots.map((slot) => RadioListTile<String>(
-                    title: Text('${slot['startTime']} - ${slot['endTime']}'),
-                    value: '${slot['startTime']} - ${slot['endTime']}',
-                    groupValue: _selectedTimeSlot,
-                    onChanged: (value) =>
-                        setState(() => _selectedTimeSlot = value),
-                  )),
-            ],
-            const SizedBox(height: 20),
+            _buildInfoTile(
+                'Number of Persons', widget.numberOfPersons.toString()),
+            Divider(),
+            _buildServiceSelection(),
+            SizedBox(height: 20),
+            _buildDatePicker(),
+            if (_selectedDate != null) _buildTimeSlots(),
+            SizedBox(height: 30),
             Center(
               child: ElevatedButton(
-                onPressed: _bookFarmhouse,
-                child: const Text('Confirm Booking'),
+                onPressed: _proceedToBooking,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  child: Text('Check Availability & Book'),
+                ),
               ),
             ),
           ],
         ),
       ),
-      bottomNavigationBar: _buildBottomNavBar(context, 0),
+      bottomNavigationBar: _buildBottomNavBar(context),
     );
   }
 
-  BottomNavigationBar _buildBottomNavBar(BuildContext context, int index) {
-    return BottomNavigationBar(
-      currentIndex: index,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-        BottomNavigationBarItem(icon: Icon(Icons.favorite), label: 'Favorites'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+  Widget _buildInfoTile(String title, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text(value, style: TextStyle(fontSize: 16)),
       ],
-      onTap: (idx) {
-        if (idx == 1) Navigator.pushNamed(context, '/favorites');
-        if (idx == 2) Navigator.pushNamed(context, '/profile');
-      },
+    );
+  }
+
+  Widget _buildServiceSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Selected Services:', style: TextStyle(fontSize: 18)),
+        SizedBox(height: 10),
+        ...widget.selectedServices.map((service) => Card(
+              elevation: 3,
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(service['name'],
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('\$${service['price']} per unit',
+                            style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                    _buildQuantityControls(service['name']),
+                  ],
+                ),
+              ),
+            )),
+      ],
+    );
+  }
+
+  Widget _buildQuantityControls(String serviceName) {
+    return Row(
+      children: [
+        IconButton(
+          icon: Icon(Icons.remove_circle_outline),
+          onPressed: () => setState(() {
+            if (_quantities[serviceName]! > 1) {
+              _quantities[serviceName] = _quantities[serviceName]! - 1;
+            }
+          }),
+        ),
+        Text('${_quantities[serviceName]}',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        IconButton(
+          icon: Icon(Icons.add_circle_outline),
+          onPressed: () => setState(() {
+            _quantities[serviceName] = _quantities[serviceName]! + 1;
+          }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePicker() {
+    return Center(
+      child: ElevatedButton(
+        onPressed: _selectDate,
+        child: Text(_selectedDate == null
+            ? 'Select Date'
+            : 'Selected: ${DateFormat.yMd().format(_selectedDate!)}'),
+      ),
+    );
+  }
+
+  Widget _buildTimeSlots() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 20),
+        Text('Available Time Slots:', style: TextStyle(fontSize: 18)),
+        ...widget.timeSlots.map((slot) {
+          bool isBooked = _bookedSlotIds.contains(slot['id']);
+          return RadioListTile<Map<String, dynamic>>(
+            title: Text('${slot['startTime']} - ${slot['endTime']}'),
+            value: slot,
+            groupValue: _selectedTimeSlot,
+            onChanged: isBooked
+                ? null
+                : (value) => setState(() => _selectedTimeSlot = value),
+            subtitle: isBooked
+                ? Text('Booked', style: TextStyle(color: Colors.red))
+                : null,
+            activeColor:
+                isBooked ? Colors.grey : Theme.of(context).primaryColor,
+          );
+        }).toList(),
+      ],
+    );
+  }
+
+  Widget _buildBottomNavBar(BuildContext context) {
+    return BottomAppBar(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          children: [
+            IconButton(
+              icon: Icon(Icons.arrow_back),
+              onPressed: () => Navigator.pop(context),
+            ),
+            Spacer(),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel Booking'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:occasioneaseuser/Screens/availability.dart';
+import 'package:occasioneaseuser/Screens/heart.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart';
 
 class QuantityAndDate extends StatefulWidget {
   final List<Map<String, dynamic>> selectedSubservices;
@@ -25,6 +28,8 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
   String? _selectedTimeSlot;
   Map<String, int> _availableCapacities = {};
   bool _isLoading = false;
+
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -115,6 +120,15 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
       return;
     }
 
+    if (widget.selectedSubservices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one service'),
+        ),
+      );
+      return;
+    }
+
     final availableCapacity = _availableCapacities[_selectedTimeSlot!] ?? 0;
     if (availableCapacity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -141,7 +155,6 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
             selectedDate: _selectedDate!,
             selectedTimeSlot: _selectedTimeSlot!,
             beautyParlorId: widget.parlorId,
-            timeSlot: _selectedTimeSlot!,
           ),
         ),
       );
@@ -155,11 +168,35 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
     }
   }
 
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    if (_selectedIndex == 0) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    } else if (_selectedIndex == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HeartScreen()),
+      );
+    } else if (_selectedIndex == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => BookingsScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Booking Details"),
+        backgroundColor: Colors.blue[700], // Professional blue UI
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -167,9 +204,13 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Selected Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700], // Heading color blue
+                ),
               ),
               const SizedBox(height: 8),
               ...widget.selectedSubservices.map((service) {
@@ -189,32 +230,7 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Price: \$${service['price']}'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (_quantities[service['name']]! > 1) {
-                                        _quantities[service['name']] =
-                                            _quantities[service['name']]! - 1;
-                                      }
-                                    });
-                                  },
-                                ),
-                                Text('${_quantities[service['name']]}'),
-                                IconButton(
-                                  icon: const Icon(Icons.add),
-                                  onPressed: () {
-                                    setState(() {
-                                      _quantities[service['name']] =
-                                          _quantities[service['name']]! + 1;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
+                            Text('Price: RS ${service['price']}'),
                           ],
                         ),
                       ],
@@ -223,9 +239,13 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
                 );
               }),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Select Date:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700], // Heading color blue
+                ),
               ),
               const SizedBox(height: 8),
               Row(
@@ -242,9 +262,13 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
               ),
               const SizedBox(height: 16),
               if (_selectedDate != null) ...[
-                const Text(
+                Text(
                   'Select Time Slot:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700], // Heading color blue
+                  ),
                 ),
                 const SizedBox(height: 8),
                 _isLoading
@@ -282,8 +306,9 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
               const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
-                  onPressed: _selectedTimeSlot != null &&
-                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0
+                  onPressed: (_selectedTimeSlot != null &&
+                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0 &&
+                          widget.selectedSubservices.isNotEmpty)
                       ? _bookAppointment
                       : null,
                   child: const Text('Book Now'),
@@ -292,6 +317,27 @@ class _QuantityAndDateState extends State<QuantityAndDate> {
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        backgroundColor: Colors.blue[700], // Set the bottom bar color
+        selectedItemColor: Colors.white, // Color for the selected item
+        unselectedItemColor: Colors.white70, // Color for unselected items
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Heart',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

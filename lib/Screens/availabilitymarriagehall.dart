@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:occasioneaseuser/Screens/succesfull.dart';
 
 class AvailabilityMarriageHall extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
@@ -63,7 +64,6 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
       }
 
       final dateStr = DateFormat('yyyy-MM-dd').format(widget.selectedDate);
-
       final bookings = await FirebaseFirestore.instance
           .collection('MarriageHallBookings')
           .where('marriageHallId', isEqualTo: widget.marriageHallId)
@@ -81,7 +81,7 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
         await FirebaseFirestore.instance
             .collection('MarriageHallBookings')
             .add({
-          'userId': user.uid, // Ensure the user ID is included correctly
+          'userId': user.uid,
           'marriageHallId': widget.marriageHallId,
           'date': dateStr,
           'timeSlot': widget.selectedTimeSlot,
@@ -102,6 +102,11 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
             content: Text('Slot is available and booked!'),
             backgroundColor: Colors.green,
           ),
+        );
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => BookingSuccessPage()),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -186,7 +191,7 @@ class _AvailabilityMarriageHallState extends State<AvailabilityMarriageHall> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
               ),
-              child: const Text('Check Availability',
+              child: const Text('Check Availability and Book',
                   style: TextStyle(fontSize: 16, color: Colors.white)),
             ),
           ],

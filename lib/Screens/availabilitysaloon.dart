@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:occasioneaseuser/Screens/succesfull.dart'; // Make sure to import your success page
+
 class AvailabilitySaloon extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
   final Map<String, int> quantities;
@@ -71,6 +73,14 @@ class _AvailabilitySaloonState extends State<AvailabilitySaloon> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Salon service booked successfully!')),
       );
+
+      // Navigate to BookingSuccessPage
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+            builder: (context) =>
+                BookingSuccessPage()), // Make sure you have your BookingSuccessPage widget defined
+      );
     } catch (e) {
       print('Error booking salon service: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -84,6 +94,7 @@ class _AvailabilitySaloonState extends State<AvailabilitySaloon> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Salon Availability"),
+        backgroundColor: Colors.blue, // Blue app bar color
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -143,6 +154,13 @@ class _AvailabilitySaloonState extends State<AvailabilitySaloon> {
                 child: ElevatedButton(
                   onPressed: _bookSalonService,
                   child: const Text('Book Salon Service'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        Colors.blue, // Blue background for the button
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 40, vertical: 15),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
             ],

@@ -278,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      drawer: _buildDrawer(), // Drawer is still functional
+      drawer: _buildDrawer(), // Moved drawer before title
       appBar: AppBar(
         title: const Text(
           'OCCASSIONEASE',
@@ -289,7 +289,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         backgroundColor: Colors.blue[700],
-        automaticallyImplyLeading: true, // Keeps drawer icon in AppBar
+        automaticallyImplyLeading: true, // Ensures the drawer icon is displayed
       ),
       body: CustomScrollView(
         slivers: [
@@ -299,8 +299,6 @@ class _HomeScreenState extends State<HomeScreen> {
             snap: true,
             backgroundColor: Colors.blue[700],
             expandedHeight: 60,
-            automaticallyImplyLeading:
-                false, // Removes drawer icon from search bar
             flexibleSpace: GestureDetector(
               onTap: () => Navigator.push(
                 context,

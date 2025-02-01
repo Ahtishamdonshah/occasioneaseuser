@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/CateringDetailsScreen.dart';
 
+import 'package:occasioneaseuser/Screens/heart.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart'; // Import BookingsScreen
+
 class Catering extends StatefulWidget {
   const Catering({Key? key}) : super(key: key);
 
@@ -13,32 +17,32 @@ class Catering extends StatefulWidget {
 class _CateringState extends State<Catering> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  int _selectedIndex = 0; // To track selected bottom navigation tab
 
-  // Function to fetch catering rating from the 'rating' collection
-  Future<double> _getCateringRating(String vendorId) async {
-    final ratingSnapshot =
-        await _firestore.collection('rating').doc(vendorId).get();
-
-    if (ratingSnapshot.exists) {
-      final ratingData = ratingSnapshot.data() as Map<String, dynamic>;
-      return ratingData['rating']?.toDouble() ??
-          0.0; // Return rating or 0 if not found
+  // Function to build the rating stars UI
+  Widget _buildRatingStars(double rating) {
+    List<Widget> stars = [];
+    for (int i = 0; i < 5; i++) {
+      stars.add(Icon(
+        i < rating ? Icons.star : Icons.star_border,
+        color: i < rating ? Colors.yellow : Colors.grey,
+      ));
     }
-    return 0.0;
+    return Row(children: stars);
   }
 
   Future<void> _toggleFavorite(String vendorId, bool isFavorite) async {
     final user = _auth.currentUser;
     if (user != null) {
-      final userFavoritesRef = _firestore
+      final favoritesRef = _firestore
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors');
 
       if (isFavorite) {
-        await userFavoritesRef.doc(vendorId).delete();
+        await favoritesRef.doc(vendorId).delete();
       } else {
-        await userFavoritesRef.doc(vendorId).set({'vendorId': vendorId});
+        await favoritesRef.doc(vendorId).set({'vendorId': vendorId});
       }
     }
   }
@@ -57,16 +61,36 @@ class _CateringState extends State<Catering> {
     return Stream.value(false);
   }
 
-  // Function to build the rating stars UI
-  Widget _buildRatingStars(double rating) {
-    List<Widget> stars = [];
-    for (int i = 0; i < 5; i++) {
-      stars.add(Icon(
-        i < rating ? Icons.star : Icons.star_border,
-        color: i < rating ? Colors.yellow : Colors.grey,
-      ));
+  // Fetch catering rating from the 'rating' collection
+  Future<double> _getCateringRating(String vendorId) async {
+    final ratingSnapshot =
+        await _firestore.collection('rating').doc(vendorId).get();
+
+    if (ratingSnapshot.exists) {
+      final ratingData = ratingSnapshot.data() as Map<String, dynamic>;
+      return ratingData['rating']?.toDouble() ??
+          0.0; // Return rating or 0 if not found
     }
-    return Row(children: stars);
+    return 0.0;
+  }
+
+  // Bottom Navigation Bar items
+  final List<Widget> _pages = [
+    HomeScreen(), // Home Screen widget
+    HeartScreen(), // Heart Screen widget
+    BookingsScreen(), // Bookings Screen widget
+  ];
+
+  // Navigation to the corresponding screen
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    // Use the Navigator to navigate to the selected page
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => _pages[index]),
+    );
   }
 
   @override
@@ -74,6 +98,7 @@ class _CateringState extends State<Catering> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Catering Services"),
+        backgroundColor: Colors.blue[700], // Professional blue color
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore.collection('Catering').snapshots(),
@@ -170,6 +195,28 @@ class _CateringState extends State<Catering> {
             },
           );
         },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        backgroundColor:
+            Colors.blue[700], // Blue color for the bottom navigation bar
+        selectedItemColor: Colors.white, // White color for selected icon
+        unselectedItemColor: Colors.white60, // Light color for unselected icons
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Heart',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

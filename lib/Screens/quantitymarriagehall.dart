@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:occasioneaseuser/Screens/availabilitymarriagehall.dart';
 
 class QuantityAndDateMarriageHallScreen extends StatefulWidget {
@@ -30,6 +31,7 @@ class _QuantityAndDateMarriageHallState
   late Map<String, int> _quantities;
   DateTime? _selectedDate;
   Map<String, dynamic>? _selectedTimeSlot;
+  List<String> _bookedSlotIds = [];
 
   @override
   void initState() {
@@ -37,6 +39,31 @@ class _QuantityAndDateMarriageHallState
     _quantities = {
       for (var service in widget.selectedServices) service['name']: 1
     };
+  }
+
+  Future<void> _fetchBookedSlots(DateTime date) async {
+    try {
+      String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+      QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('marriageHallId', isEqualTo: widget.marriageHallId)
+          .where('date', isEqualTo: formattedDate)
+          .get();
+
+      List<String> bookedSlotIds = [];
+      for (var doc in querySnapshot.docs) {
+        bookedSlotIds.add(doc['timeSlotId'] as String);
+      }
+
+      setState(() {
+        _bookedSlotIds = bookedSlotIds;
+      });
+    } catch (e) {
+      print('Error fetching booked slots: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error checking availability')),
+      );
+    }
   }
 
   void _selectDate() async {
@@ -50,15 +77,53 @@ class _QuantityAndDateMarriageHallState
     if (pickedDate != null && pickedDate != _selectedDate) {
       setState(() {
         _selectedDate = pickedDate;
-        _selectedTimeSlot = null; // Reset time slot when the date changes
+        _selectedTimeSlot = null;
       });
+      await _fetchBookedSlots(pickedDate);
     }
   }
 
-  void _proceedToBooking() {
+  Future<bool> _checkAvailability(
+      DateTime date, Map<String, dynamic> timeSlot) async {
+    try {
+      String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+      QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('marriageHallId', isEqualTo: widget.marriageHallId)
+          .where('date', isEqualTo: formattedDate)
+          .where('timeSlotId', isEqualTo: timeSlot['id'])
+          .get();
+
+      return querySnapshot.docs.isEmpty;
+    } catch (e) {
+      print('Error checking availability: $e');
+      return false;
+    }
+  }
+
+  void _proceedToBooking() async {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please select date and time slot')),
+      );
+      return;
+    }
+
+    bool isAvailable =
+        await _checkAvailability(_selectedDate!, _selectedTimeSlot!);
+    if (!isAvailable) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Slot Booked'),
+          content: Text('This slot is already booked. Please choose another.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('OK'),
+            ),
+          ],
+        ),
       );
       return;
     }
@@ -195,12 +260,22 @@ class _QuantityAndDateMarriageHallState
       children: [
         SizedBox(height: 20),
         Text('Available Time Slots:', style: TextStyle(fontSize: 18)),
-        ...widget.timeSlots.map((slot) => RadioListTile<Map<String, dynamic>>(
-              title: Text('${slot['startTime']} - ${slot['endTime']}'),
-              value: slot,
-              groupValue: _selectedTimeSlot,
-              onChanged: (value) => setState(() => _selectedTimeSlot = value),
-            )),
+        ...widget.timeSlots.map((slot) {
+          bool isBooked = _bookedSlotIds.contains(slot['id']);
+          return RadioListTile<Map<String, dynamic>>(
+            title: Text('${slot['startTime']} - ${slot['endTime']}'),
+            value: slot,
+            groupValue: _selectedTimeSlot,
+            onChanged: isBooked
+                ? null
+                : (value) => setState(() => _selectedTimeSlot = value),
+            subtitle: isBooked
+                ? Text('Booked', style: TextStyle(color: Colors.red))
+                : null,
+            activeColor:
+                isBooked ? Colors.grey : Theme.of(context).primaryColor,
+          );
+        }),
       ],
     );
   }

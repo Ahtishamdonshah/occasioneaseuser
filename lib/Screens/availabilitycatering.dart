@@ -1,25 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:occasioneaseuser/Screens/succesfull.dart';
 
 class AvailabilityCatering extends StatefulWidget {
   final String cateringId;
-  final List<String> timeSlots;
   final List<Map<String, dynamic>> selectedSubservices;
   final Map<String, int> quantities;
   final DateTime selectedDate;
   final String selectedTimeSlot;
-  final String userId;
 
   const AvailabilityCatering({
     Key? key,
     required this.cateringId,
-    required this.timeSlots,
     required this.selectedSubservices,
     required this.quantities,
     required this.selectedDate,
     required this.selectedTimeSlot,
-    required this.userId,
   }) : super(key: key);
 
   @override
@@ -28,7 +26,6 @@ class AvailabilityCatering extends StatefulWidget {
 
 class _AvailabilityCateringState extends State<AvailabilityCatering> {
   double _totalPrice = 0.0;
-  bool _isBooking = false; // Added booking state flag
 
   @override
   void initState() {
@@ -47,13 +44,17 @@ class _AvailabilityCateringState extends State<AvailabilityCatering> {
   }
 
   Future<void> _bookCateringService() async {
-    if (_isBooking) return; // Prevent multiple submissions
-
-    setState(() => _isBooking = true);
-
     try {
-      final bookingData = {
-        'userId': widget.userId,
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not logged in')),
+        );
+        return;
+      }
+
+      await FirebaseFirestore.instance.collection('CateringBookings').add({
+        'userId': user.uid,
         'cateringId': widget.cateringId,
         'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
         'timeSlot': widget.selectedTimeSlot,
@@ -66,45 +67,22 @@ class _AvailabilityCateringState extends State<AvailabilityCatering> {
             .toList(),
         'totalPrice': _totalPrice,
         'status': 'BOOKED',
-        'createdAt': FieldValue.serverTimestamp(), // Add server timestamp
-      };
-
-      // Check for existing bookings first
-      final existingBookings = await FirebaseFirestore.instance
-          .collection('CateringBookings')
-          .where('userId', isEqualTo: widget.userId)
-          .where('cateringId', isEqualTo: widget.cateringId)
-          .where('date', isEqualTo: bookingData['date'])
-          .where('timeSlot', isEqualTo: widget.selectedTimeSlot)
-          .get();
-
-      if (existingBookings.docs.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('You already have a booking for this slot')),
-        );
-        return;
-      }
-
-      await FirebaseFirestore.instance
-          .collection('CateringBookings')
-          .add(bookingData);
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Catering Service Booked Successfully')),
       );
 
-      // Navigate back after successful booking
-      if (mounted) Navigator.of(context).pop();
+      // Navigate to Success page
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => BookingSuccessPage()),
+      );
     } catch (e) {
       print('Error booking catering service: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to book catering service')),
       );
-    } finally {
-      if (mounted) {
-        setState(() => _isBooking = false);
-      }
     }
   }
 
@@ -113,6 +91,7 @@ class _AvailabilityCateringState extends State<AvailabilityCatering> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Check Catering Availability"),
+        backgroundColor: Colors.blue, // Professional blue color
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -170,14 +149,14 @@ class _AvailabilityCateringState extends State<AvailabilityCatering> {
               const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
-                  onPressed: _isBooking ? null : _bookCateringService,
-                  child: _isBooking
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Book Catering Service'),
+                  onPressed: _bookCateringService,
+                  child: const Text('Book Catering Service'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 40, vertical: 15),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
             ],

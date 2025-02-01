@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/ParlorDetailsScreen.dart';
 
+import 'package:occasioneaseuser/Screens/heart.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart'; // Import BookingsScreen
+
 class BeautyParlor extends StatefulWidget {
   const BeautyParlor({Key? key}) : super(key: key);
 
@@ -13,6 +17,7 @@ class BeautyParlor extends StatefulWidget {
 class _BeautyParlorState extends State<BeautyParlor> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  int _selectedIndex = 0; // To track selected bottom navigation tab
 
   // Function to build the rating stars UI
   Widget _buildRatingStars(double rating) {
@@ -69,11 +74,31 @@ class _BeautyParlorState extends State<BeautyParlor> {
     return 0.0;
   }
 
+  // Bottom Navigation Bar items
+  final List<Widget> _pages = [
+    HomeScreen(), // Home Screen widget
+    HeartScreen(), // Heart Screen widget
+    BookingsScreen(), // Bookings Screen widget
+  ];
+
+  // Navigation to the corresponding screen
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    // Use the Navigator to navigate to the selected page
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => _pages[index]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Beauty Parlors"),
+        backgroundColor: Colors.blue[700], // Professional blue color
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore.collection('Beauty Parlors').snapshots(),
@@ -170,6 +195,28 @@ class _BeautyParlorState extends State<BeautyParlor> {
             },
           );
         },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        backgroundColor:
+            Colors.blue[700], // Blue color for the bottom navigation bar
+        selectedItemColor: Colors.white, // White color for selected icon
+        unselectedItemColor: Colors.white60, // Light color for unselected icons
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Heart',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

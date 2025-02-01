@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/ParlorDetailsScreen.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart';
 
 class HeartScreen extends StatefulWidget {
   const HeartScreen({Key? key}) : super(key: key);
@@ -15,6 +17,7 @@ class _HeartScreenState extends State<HeartScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Stream<QuerySnapshot>? _userFavoritesStream;
+  int _selectedIndex = 1; // HeartScreen is selected by default
 
   @override
   void initState() {
@@ -41,13 +44,8 @@ class _HeartScreenState extends State<HeartScreen> {
           .doc(user.uid)
           .collection('vendors');
 
-      final userFavoritesRef = _firestore
-          .collection('userFavorites')
-          .doc(user.uid)
-          .collection('vendors');
-
-      await favoritesRef.doc(user.uid).delete();
-      await userFavoritesRef.doc(vendorId).delete();
+      // Remove the vendor from favorites in Firestore
+      await favoritesRef.doc(vendorId).delete();
     }
   }
 
@@ -75,11 +73,32 @@ class _HeartScreenState extends State<HeartScreen> {
     return null;
   }
 
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    switch (index) {
+      case 0:
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (context) => HomeScreen()));
+        break;
+      case 1:
+        // Stay on HeartScreen
+        break;
+      case 2:
+        Navigator.pushReplacement(
+            context, MaterialPageRoute(builder: (context) => BookingsScreen()));
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Favorite Vendors"),
+        backgroundColor: Colors.blue,
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _userFavoritesStream,
@@ -108,9 +127,7 @@ class _HeartScreenState extends State<HeartScreen> {
                     return const ListTile(title: Text('Loading...'));
                   }
                   if (vendorSnapshot.hasError || !vendorSnapshot.hasData) {
-                    return ListTile(
-                      title: Text('Error loading vendor'),
-                    );
+                    return ListTile(title: Text('Error loading vendor'));
                   }
 
                   final vendorData = vendorSnapshot.data!;
@@ -129,6 +146,10 @@ class _HeartScreenState extends State<HeartScreen> {
                         icon: Icon(Icons.favorite, color: Colors.red),
                         onPressed: () async {
                           await _toggleFavorite(vendorId);
+                          // Update the UI to remove the vendor immediately
+                          setState(() {
+                            snapshot.data!.docs.removeAt(index);
+                          });
                         },
                       ),
                       onTap: () {
@@ -151,6 +172,27 @@ class _HeartScreenState extends State<HeartScreen> {
             },
           );
         },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Favorites',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bookmark),
+            label: 'Bookings',
+          ),
+        ],
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white,
+        backgroundColor: Colors.blue,
       ),
     );
   }

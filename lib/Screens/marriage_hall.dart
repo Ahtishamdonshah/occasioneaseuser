@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/MarriageHallDetailingScreen.dart';
 
+import 'package:occasioneaseuser/Screens/heart.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart'; // Import BookingsScreen
+
 class MarriageHall extends StatefulWidget {
   const MarriageHall({Key? key}) : super(key: key);
 
@@ -13,6 +17,7 @@ class MarriageHall extends StatefulWidget {
 class _MarriageHallState extends State<MarriageHall> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  int _currentIndex = 0;
 
   // Function to build the rating stars UI
   Widget _buildRatingStars(double rating) {
@@ -58,21 +63,60 @@ class _MarriageHallState extends State<MarriageHall> {
 
   // Fetch marriage hall's rating from the 'rating' collection
   Future<double> _getHallRating(String vendorId) async {
-    final ratingSnapshot =
-        await _firestore.collection('rating').doc(vendorId).get();
+    try {
+      final ratingSnapshot =
+          await _firestore.collection('rating').doc(vendorId).get();
 
-    if (ratingSnapshot.exists) {
-      final ratingData = ratingSnapshot.data() as Map<String, dynamic>;
-      return ratingData['rating']?.toDouble() ??
-          0.0; // Return rating or 0 if not found
+      if (ratingSnapshot.exists) {
+        final ratingData = ratingSnapshot.data() as Map<String, dynamic>;
+        return ratingData['rating']?.toDouble() ??
+            0.0; // Return rating or 0 if not found
+      }
+      return 0.0;
+    } catch (e) {
+      print('Error fetching rating: $e');
+      return 0.0;
     }
-    return 0.0;
+  }
+
+  // Function to change the current index of the bottom navigation bar
+  void _onBottomNavTapped(int index) {
+    setState(() {
+      _currentIndex = index;
+    });
+
+    switch (index) {
+      case 0:
+        // Navigate to HomeScreen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+        break;
+      case 1:
+        // Navigate to HeartScreen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HeartScreen()),
+        );
+        break;
+      case 2:
+        // Navigate to BookingsScreen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => BookingsScreen()),
+        );
+        break;
+      default:
+        break;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.blue, // Set AppBar color to blue
         title: const Text("Marriage Halls"),
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -176,6 +220,30 @@ class _MarriageHallState extends State<MarriageHall> {
             },
           );
         },
+      ),
+      // Bottom Navigation Bar with blue background
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: _onBottomNavTapped,
+        selectedItemColor:
+            Colors.white, // Highlight selected item with white color
+        unselectedItemColor: Colors.white70, // Unselected items in light white
+        backgroundColor:
+            Colors.blue, // Set bottom navigation bar background color to blue
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Heart',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-
-import 'package:occasioneaseuser/Screens/availabilitysaloon.dart';
+import 'package:occasioneaseuser/Screens/availabilitysaloon.dart'; // Adjust import as per your actual file
+import 'package:occasioneaseuser/Screens/heart.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart';
 
 class QuantitySaloon extends StatefulWidget {
   final List<Map<String, dynamic>> selectedSubservices;
@@ -27,11 +29,13 @@ class _QuantitySaloonState extends State<QuantitySaloon> {
   Map<String, int> _availableCapacities = {};
   bool _isLoading = false;
 
+  int _selectedIndex = 0;
+
   @override
   void initState() {
     super.initState();
     for (var service in widget.selectedSubservices) {
-      _quantities[service['name']] = 1;
+      _quantities[service['name']] = 1; // Initialize quantity to 1
     }
   }
 
@@ -40,7 +44,7 @@ class _QuantitySaloonState extends State<QuantitySaloon> {
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
     );
 
     if (pickedDate != null && pickedDate != _selectedDate) {
@@ -49,8 +53,12 @@ class _QuantitySaloonState extends State<QuantitySaloon> {
         _selectedTimeSlot = null;
         _isLoading = true;
       });
+
       await _calculateAvailableCapacities(pickedDate);
-      setState(() => _isLoading = false);
+
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -63,47 +71,79 @@ class _QuantitySaloonState extends State<QuantitySaloon> {
         .get();
 
     final Map<String, int> bookedQuantities = {};
+
     for (var bookingDoc in bookingsQuery.docs) {
       final bookingData = bookingDoc.data();
-      final timeSlot = bookingData['timeSlot'];
-      final services = bookingData['services'];
+      final timeSlot = bookingData['timeSlot'] as String?;
+      final services = bookingData['services'] as List<dynamic>?;
+
       if (timeSlot == null || services == null) continue;
 
-      int totalQuantity =
-          services.fold(0, (sum, service) => sum + (service['quantity'] ?? 0));
-      bookedQuantities.update(timeSlot, (value) => value + totalQuantity,
-          ifAbsent: () => totalQuantity);
+      int totalQuantity = 0;
+      for (var service in services) {
+        totalQuantity += (service['quantity'] as int?) ?? 0;
+      }
+
+      bookedQuantities.update(
+        timeSlot,
+        (value) => value + totalQuantity,
+        ifAbsent: () => totalQuantity,
+      );
     }
 
     final Map<String, int> availableCapacities = {};
+
     for (var timeSlot in widget.timeSlots) {
-      final startTime = timeSlot['startTime'] ?? '';
-      final endTime = timeSlot['endTime'] ?? '';
-      final capacity = timeSlot['capacity'] ?? 0;
+      final startTime = timeSlot['startTime'] as String? ?? '';
+      final endTime = timeSlot['endTime'] as String? ?? '';
+      final capacity = (timeSlot['capacity'] as int?) ?? 0;
       final timeSlotString = '$startTime - $endTime';
-      availableCapacities[timeSlotString] =
-          capacity - (bookedQuantities[timeSlotString] ?? 0);
+
+      final booked = bookedQuantities[timeSlotString] ?? 0;
+      final available = capacity - booked;
+
+      availableCapacities[timeSlotString] = available;
     }
 
-    setState(() => _availableCapacities = availableCapacities);
+    setState(() {
+      _availableCapacities = availableCapacities;
+    });
   }
 
   Future<void> _bookAppointment() async {
     if (_selectedDate == null || _selectedTimeSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select date and time')));
+        const SnackBar(
+          content: Text('Please select a date and time slot'),
+        ),
+      );
       return;
     }
 
-    if ((_availableCapacities[_selectedTimeSlot!] ?? 0) <= 0) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Time slot unavailable')));
+    if (widget.selectedSubservices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select at least one service'),
+        ),
+      );
+      return;
+    }
+
+    final availableCapacity = _availableCapacities[_selectedTimeSlot!] ?? 0;
+    if (availableCapacity <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This time slot is no longer available'),
+        ),
+      );
       return;
     }
 
     try {
       final totalPrice = widget.selectedSubservices.fold(0.0, (sum, service) {
-        return sum + (service['price'] * _quantities[service['name']]!);
+        final price = (service['price'] as num?)?.toDouble() ?? 0.0;
+        final quantity = _quantities[service['name']] ?? 0;
+        return sum + (price * quantity);
       });
 
       Navigator.push(
@@ -119,107 +159,181 @@ class _QuantitySaloonState extends State<QuantitySaloon> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Booking failed')));
+      print('Error booking appointment: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to book appointment'),
+        ),
+      );
+    }
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    if (_selectedIndex == 0) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    } else if (_selectedIndex == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HeartScreen()),
+      );
+    } else if (_selectedIndex == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => BookingsScreen()),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Booking Details")),
+      appBar: AppBar(
+        title: const Text("Booking Details"),
+        backgroundColor: Colors.blue[700], // Professional blue UI
+      ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Selected Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ...widget.selectedSubservices.map((service) => Card(
-                  margin: EdgeInsets.symmetric(vertical: 8),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Selected Services:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700], // Heading color blue
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...widget.selectedSubservices.map((service) {
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(service['name'],
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(
+                          service['name'],
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Price: \$${service['price']}'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.remove),
-                                  onPressed: () => setState(() {
-                                    if (_quantities[service['name']]! > 1) {
-                                      _quantities[service['name']] =
-                                          _quantities[service['name']]! - 1;
-                                    }
-                                  }),
-                                ),
-                                Text('${_quantities[service['name']]}'),
-                                IconButton(
-                                  icon: Icon(Icons.add),
-                                  onPressed: () => setState(() =>
-                                      _quantities[service['name']] =
-                                          _quantities[service['name']]! + 1),
-                                ),
-                              ],
-                            ),
+                            Text('Price: RS ${service['price']}'),
                           ],
                         ),
                       ],
                     ),
                   ),
-                )),
-            SizedBox(height: 16),
-            Text('Select Date:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ElevatedButton(
-              onPressed: _selectDate,
-              child: Text(_selectedDate == null
-                  ? 'Choose Date'
-                  : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
-            ),
-            if (_selectedDate != null) ...[
-              SizedBox(height: 16),
-              Text('Select Time Slot:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              _isLoading
-                  ? CircularProgressIndicator()
-                  : Column(
-                      children: widget.timeSlots.map((timeSlot) {
-                        final startTime = timeSlot['startTime'] ?? '';
-                        final endTime = timeSlot['endTime'] ?? '';
-                        final timeSlotString = '$startTime - $endTime';
-                        final available =
-                            _availableCapacities[timeSlotString] ?? 0;
-                        return RadioListTile<String>(
-                          title: Text('$timeSlotString ($available available)'),
-                          value: timeSlotString,
-                          groupValue: _selectedTimeSlot,
-                          onChanged: available > 0
-                              ? (value) =>
-                                  setState(() => _selectedTimeSlot = value)
-                              : null,
-                        );
-                      }).toList(),
+                );
+              }),
+              const SizedBox(height: 16),
+              Text(
+                'Select Date:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700], // Heading color blue
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _selectDate,
+                      child: Text(_selectedDate == null
+                          ? 'Choose Date'
+                          : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (_selectedDate != null) ...[
+                Text(
+                  'Select Time Slot:',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700], // Heading color blue
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _isLoading
+                    ? const CircularProgressIndicator()
+                    : Column(
+                        children: widget.timeSlots.map((timeSlot) {
+                          final startTime =
+                              timeSlot['startTime'] as String? ?? '';
+                          final endTime = timeSlot['endTime'] as String? ?? '';
+                          final timeSlotString = '$startTime - $endTime';
+                          final availableCapacity =
+                              _availableCapacities[timeSlotString] ?? 0;
+                          final isAvailable = availableCapacity > 0;
+
+                          return RadioListTile<String>(
+                            title: Text(
+                                '$timeSlotString ($availableCapacity available)'),
+                            subtitle: !isAvailable
+                                ? const Text('Not available',
+                                    style: TextStyle(color: Colors.red))
+                                : null,
+                            value: timeSlotString,
+                            groupValue: _selectedTimeSlot,
+                            onChanged: isAvailable
+                                ? (value) {
+                                    setState(() {
+                                      _selectedTimeSlot = value;
+                                    });
+                                  }
+                                : null,
+                          );
+                        }).toList(),
+                      ),
+              ],
+              const SizedBox(height: 16),
+              // Center the button
               Center(
                 child: ElevatedButton(
-                  onPressed: _selectedTimeSlot != null &&
-                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0
-                      ? _bookAppointment
-                      : null,
-                  child: const Text('Book Now'),
+                  onPressed: _bookAppointment,
+                  child: const Text('Confirm Booking'),
                 ),
               ),
             ],
-          ],
+          ),
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        backgroundColor:
+            Colors.blue[700], // Blue color for the bottom navigation bar
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Favorites',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

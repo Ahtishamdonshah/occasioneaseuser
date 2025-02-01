@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/SalonDetailsScreen.dart';
 
+import 'package:occasioneaseuser/Screens/heart.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart'; // Import BookingsScreen
+
 class Salon extends StatefulWidget {
   const Salon({Key? key}) : super(key: key);
 
@@ -13,12 +17,12 @@ class Salon extends StatefulWidget {
 class _SalonState extends State<Salon> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  int _selectedIndex = 0; // To track selected bottom navigation tab
 
   // Function to fetch salon rating from the 'rating' collection
   Future<double> _getSalonRating(String vendorId) async {
     final ratingSnapshot =
         await _firestore.collection('rating').doc(vendorId).get();
-
     if (ratingSnapshot.exists) {
       final ratingData = ratingSnapshot.data() as Map<String, dynamic>;
       return ratingData['rating']?.toDouble() ??
@@ -34,7 +38,6 @@ class _SalonState extends State<Salon> {
           .collection('userFavorites')
           .doc(user.uid)
           .collection('vendors');
-
       if (isFavorite) {
         await userFavoritesRef.doc(vendorId).delete();
       } else {
@@ -69,10 +72,32 @@ class _SalonState extends State<Salon> {
     return Row(children: stars);
   }
 
+  // Bottom Navigation Bar items
+  final List<Widget> _pages = [
+    HomeScreen(), // Home Screen widget
+    HeartScreen(), // Heart Screen widget
+    BookingsScreen(), // Bookings Screen widget
+  ];
+
+  // Navigation to the corresponding screen
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    // Use the Navigator to navigate to the selected page
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => _pages[index]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Saloons")),
+      appBar: AppBar(
+        title: const Text("Saloons"),
+        backgroundColor: Colors.blue, // Blue color for the AppBar
+      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore.collection('Saloons').snapshots(),
         builder: (context, snapshot) {
@@ -171,6 +196,28 @@ class _SalonState extends State<Salon> {
             },
           );
         },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        backgroundColor:
+            Colors.blue[700], // Blue color for the bottom navigation bar
+        selectedItemColor: Colors.white, // White color for selected icon
+        unselectedItemColor: Colors.white60, // Light color for unselected icons
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Heart',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

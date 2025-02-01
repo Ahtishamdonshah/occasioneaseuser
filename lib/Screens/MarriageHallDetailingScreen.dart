@@ -40,7 +40,7 @@ class _MarriageHallDetailingScreenState
       appBar: AppBar(
         title: Text(widget.hallData['name'],
             style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blue.shade800,
+        backgroundColor: const Color.fromARGB(255, 29, 118, 219),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -84,7 +84,7 @@ class _MarriageHallDetailingScreenState
                         style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade900)),
+                            color: const Color.fromARGB(255, 22, 98, 212))),
                     Text(widget.hallData['location'],
                         style: TextStyle(fontSize: 16, color: Colors.black87)),
                     SizedBox(height: 10),
@@ -192,7 +192,7 @@ class _MarriageHallDetailingScreenState
                 child:
                     Text('Proceed to Booking', style: TextStyle(fontSize: 16)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade800,
+                  backgroundColor: const Color.fromARGB(255, 41, 129, 230),
                   padding: EdgeInsets.symmetric(vertical: 15),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),

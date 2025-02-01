@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart';
 import 'availabilitycatering.dart';
+import 'home_screem.dart';
+import 'heart.dart';
 
 class QuantityCatering extends StatefulWidget {
   final List<Map<String, dynamic>> selectedSubservices;
@@ -27,13 +30,15 @@ class _QuantityCateringState extends State<QuantityCatering> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   Map<String, int> _availableCapacities = {};
   bool _isLoading = false;
-  bool _isBooking = false; // Added booking state flag
+  bool _isBooking = false;
+
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
     for (var service in widget.selectedSubservices) {
-      _quantities[service['name']] = 1;
+      _quantities[service['name']] = 1; // Initialize quantity to 1
     }
   }
 
@@ -142,26 +147,49 @@ class _QuantityCateringState extends State<QuantityCatering> {
         MaterialPageRoute(
           builder: (context) => AvailabilityCatering(
             cateringId: widget.cateringId,
-            timeSlots: widget.timeSlots
-                .map((slot) => '${slot['startTime']} - ${slot['endTime']}')
-                .toList(),
             selectedSubservices: widget.selectedSubservices,
             quantities: _quantities,
             selectedDate: _selectedDate!,
             selectedTimeSlot: _selectedTimeSlot!,
-            userId: user.uid,
           ),
         ),
-      ).then((_) => setState(() => _isBooking = false));
+      ).then((_) {
+        if (mounted) {
+          setState(() {
+            _isBooking = false;
+          });
+        }
+      });
     } catch (e) {
-      print('Error booking appointment: $e');
+      setState(() {
+        _isBooking = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to book appointment')),
       );
-    } finally {
-      if (mounted && _isBooking) {
-        setState(() => _isBooking = false);
-      }
+    }
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    if (_selectedIndex == 0) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    } else if (_selectedIndex == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HeartScreen()),
+      );
+    } else if (_selectedIndex == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => BookingsScreen()),
+      );
     }
   }
 
@@ -169,7 +197,8 @@ class _QuantityCateringState extends State<QuantityCatering> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Catering Booking Details"),
+        title: const Text("Booking Details"),
+        backgroundColor: Colors.blue[700],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -177,9 +206,13 @@ class _QuantityCateringState extends State<QuantityCatering> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Selected Catering Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                'Selected Services:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                ),
               ),
               const SizedBox(height: 8),
               ...widget.selectedSubservices.map((service) {
@@ -199,32 +232,7 @@ class _QuantityCateringState extends State<QuantityCatering> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Price: \$${service['price']}'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove),
-                                  onPressed: () {
-                                    setState(() {
-                                      if (_quantities[service['name']]! > 1) {
-                                        _quantities[service['name']] =
-                                            _quantities[service['name']]! - 1;
-                                      }
-                                    });
-                                  },
-                                ),
-                                Text('${_quantities[service['name']]}'),
-                                IconButton(
-                                  icon: const Icon(Icons.add),
-                                  onPressed: () {
-                                    setState(() {
-                                      _quantities[service['name']] =
-                                          _quantities[service['name']]! + 1;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
+                            Text('Price: RS ${service['price']}'),
                           ],
                         ),
                       ],
@@ -233,9 +241,13 @@ class _QuantityCateringState extends State<QuantityCatering> {
                 );
               }).toList(),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Select Date:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                ),
               ),
               const SizedBox(height: 8),
               Row(
@@ -252,9 +264,13 @@ class _QuantityCateringState extends State<QuantityCatering> {
               ),
               const SizedBox(height: 16),
               if (_selectedDate != null) ...[
-                const Text(
+                Text(
                   'Select Time Slot:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[700],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 _isLoading
@@ -292,9 +308,9 @@ class _QuantityCateringState extends State<QuantityCatering> {
               const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
-                  onPressed: (!_isBooking && // Added booking state check
-                          _selectedTimeSlot != null &&
-                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0)
+                  onPressed: (_selectedTimeSlot != null &&
+                          (_availableCapacities[_selectedTimeSlot!] ?? 0) > 0 &&
+                          widget.selectedSubservices.isNotEmpty)
                       ? _bookAppointment
                       : null,
                   child: _isBooking
@@ -305,6 +321,27 @@ class _QuantityCateringState extends State<QuantityCatering> {
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        backgroundColor: Colors.blue[700],
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white70,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Heart',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

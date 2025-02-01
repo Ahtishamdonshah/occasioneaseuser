@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:occasioneaseuser/Screens/heart.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+
 import 'package:occasioneaseuser/Screens/quantitycatering.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart';
 
 class CateringDetailsScreen extends StatefulWidget {
   final String cateringId;
@@ -20,6 +24,7 @@ class CateringDetailsScreen extends StatefulWidget {
 class _CateringDetailsScreenState extends State<CateringDetailsScreen> {
   final Map<String, List<Map<String, dynamic>>> _servicesByCategory = {};
   final Map<String, List<bool>> _selectedSubServices = {};
+  int _currentImageIndex = 0;
 
   @override
   void initState() {
@@ -36,6 +41,15 @@ class _CateringDetailsScreenState extends State<CateringDetailsScreen> {
     }
   }
 
+  void _changeImage(int direction, List<String> images) {
+    setState(() {
+      _currentImageIndex = (_currentImageIndex + direction) % images.length;
+      if (_currentImageIndex < 0) {
+        _currentImageIndex = images.length - 1;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<String> images =
@@ -46,26 +60,40 @@ class _CateringDetailsScreenState extends State<CateringDetailsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(name),
+        backgroundColor: Colors.blue,
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (images.isNotEmpty)
-              Container(
+              SizedBox(
                 height: 200,
-                margin: const EdgeInsets.only(bottom: 16),
-                child: PageView(
-                  children: images
-                      .map(
-                        (url) => Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Center(child: Text('Image not available')),
-                        ),
-                      )
-                      .toList(),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Image.network(
+                      images[_currentImageIndex],
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (context, error, stackTrace) =>
+                          const Center(child: Text('Image not available')),
+                    ),
+                    Positioned(
+                      left: 10,
+                      child: IconButton(
+                        icon: Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => _changeImage(-1, images),
+                      ),
+                    ),
+                    Positioned(
+                      right: 10,
+                      child: IconButton(
+                        icon: Icon(Icons.arrow_forward, color: Colors.white),
+                        onPressed: () => _changeImage(1, images),
+                      ),
+                    ),
+                  ],
                 ),
               )
             else
@@ -81,14 +109,19 @@ class _CateringDetailsScreenState extends State<CateringDetailsScreen> {
                 children: [
                   Text(name,
                       style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold)),
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue)),
                   const SizedBox(height: 8),
                   Text('Location: $location',
-                      style: const TextStyle(fontSize: 16)),
+                      style:
+                          const TextStyle(fontSize: 16, color: Colors.black54)),
                   const SizedBox(height: 16),
                   const Text('Services:',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue)),
                   const SizedBox(height: 8),
                   ..._servicesByCategory.entries.map((entry) {
                     final category = entry.key;
@@ -96,7 +129,8 @@ class _CateringDetailsScreenState extends State<CateringDetailsScreen> {
                     return ExpansionTile(
                       title: Text(
                         category,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.blue),
                       ),
                       children: List.generate(services.length, (index) {
                         final service = services[index];
@@ -146,8 +180,8 @@ class _CateringDetailsScreenState extends State<CateringDetailsScreen> {
                           MaterialPageRoute(
                             builder: (context) => QuantityCatering(
                               selectedSubservices: selectedServices,
-                              timeSlots: widget.timeSlots,
                               cateringId: widget.cateringId,
+                              timeSlots: widget.timeSlots,
                             ),
                           ),
                         );
@@ -160,6 +194,29 @@ class _CateringDetailsScreenState extends State<CateringDetailsScreen> {
             ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.blue,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white70,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.favorite), label: 'Favorites'),
+          BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Bookings'),
+        ],
+        onTap: (index) {
+          if (index == 0) {
+            Navigator.push(
+                context, MaterialPageRoute(builder: (context) => HomeScreen()));
+          } else if (index == 1) {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (context) => HeartScreen()));
+          } else if (index == 2) {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (context) => BookingsScreen()));
+          }
+        },
       ),
     );
   }

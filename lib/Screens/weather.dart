@@ -16,6 +16,7 @@ class _WeatherState extends State<Weather> {
 
   // Weather Data
   String temperature = "--";
+  String weatherCondition = "";
   bool isLoading = false;
 
   @override
@@ -42,6 +43,8 @@ class _WeatherState extends State<Weather> {
         final data = json.decode(response.body);
         setState(() {
           temperature = "${data['current']['temp_c']}°C";
+          weatherCondition =
+              data['current']['condition']['text']; // Get condition
         });
       } else {
         setState(() {
@@ -108,6 +111,17 @@ class _WeatherState extends State<Weather> {
                         ),
                         const SizedBox(height: 20),
 
+                        // Display Weather Condition (Sunny, Cold, Warm, etc.)
+                        Text(
+                          weatherCondition,
+                          style: const TextStyle(
+                            fontSize: 24.0,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.blueAccent,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
                         // Change City Button
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
@@ -124,6 +138,7 @@ class _WeatherState extends State<Weather> {
                               setState(() {
                                 cityName = newCity;
                                 temperature = "Loading...";
+                                weatherCondition = "";
                               });
                               fetchWeather(newCity);
                             }

@@ -3,6 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:occasioneaseuser/Screens/FarmhouseDetailsScreen.dart';
 
+import 'package:occasioneaseuser/Screens/heart.dart';
+import 'package:occasioneaseuser/Screens/home_screem.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart'; // Adjust import if needed
+
 class Farmhouse extends StatefulWidget {
   const Farmhouse({Key? key}) : super(key: key);
 
@@ -73,6 +77,7 @@ class _FarmhouseState extends State<Farmhouse> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.blue, // Professional blue color for the app bar
         title: const Text("Farmhouses"),
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -178,6 +183,48 @@ class _FarmhouseState extends State<Farmhouse> {
             },
           );
         },
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: 0, // Keep track of the current selected index
+        selectedItemColor: Colors.blue, // Set the color of the selected item
+        unselectedItemColor:
+            Colors.grey, // Set the color of the unselected items
+        onTap: (int index) {
+          switch (index) {
+            case 0:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomeScreen()),
+              );
+              break;
+            case 1:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HeartScreen()),
+              );
+              break;
+            case 2:
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => BookingsScreen()),
+              );
+              break;
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Favorites',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.bookmark),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

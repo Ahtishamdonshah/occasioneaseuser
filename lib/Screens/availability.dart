@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:occasioneaseuser/Screens/succesfull.dart';
 
 class availability extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
@@ -17,7 +18,6 @@ class availability extends StatefulWidget {
     required this.selectedDate,
     required this.selectedTimeSlot,
     required this.beautyParlorId,
-    required String timeSlot,
   }) : super(key: key);
 
   @override
@@ -53,15 +53,6 @@ class _availabilityState extends State<availability> {
         return;
       }
 
-      // // Navigate to the StripePayment screen
-      // final paymentSuccess = await Navigator.of(context).push(
-      //   MaterialPageRoute(
-      //     builder: (context) => StripePayment(price: _totalPrice.toString()),
-      //   ),
-      // );
-
-      // If payment is successful, save the booking data to Firebase
-      //  if (paymentSuccess == true) {
       await FirebaseFirestore.instance.collection('BeautyParlorBookings').add({
         'userId': user.uid,
         'beautyParlorId': widget.beautyParlorId,
@@ -83,13 +74,11 @@ class _availabilityState extends State<availability> {
             content: Text('Beauty Parlor Service Booked Successfully')),
       );
 
-      // Navigate back or to another page if needed
-      // } else {
-      //   ScaffoldMessenger.of(context).showSnackBar(
-      //     const SnackBar(
-      //         content: Text('Payment failed, booking not completed')),
-      //   );
-      // }
+      // Navigate to Success page
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => BookingSuccessPage()),
+      );
     } catch (e) {
       print('Error booking beauty parlor service: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -103,6 +92,7 @@ class _availabilityState extends State<availability> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Check Beauty Parlor Availability"),
+        backgroundColor: Colors.blue, // Professional blue color
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -161,7 +151,13 @@ class _availabilityState extends State<availability> {
               Center(
                 child: ElevatedButton(
                   onPressed: _bookBeautyParlorService,
-                  child: const Text('Book Beauty Parlor Service'),
+                  child: const Text('Book Beauty Parlor Services'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 40, vertical: 15),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
             ],

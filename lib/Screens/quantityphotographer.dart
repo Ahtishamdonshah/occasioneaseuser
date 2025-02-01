@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:occasioneaseuser/Screens/availabilityphotographer.dart';
+import 'package:occasioneaseuser/Screens/viewbooking.dart';
+import 'home_screem.dart';
+import 'heart.dart';
 
 class QuantityPhotographer extends StatefulWidget {
   final List<Map<String, dynamic>> selectedSubservices;
@@ -25,6 +28,7 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
   String? _selectedTimeSlot;
   Map<String, int> _availableCapacities = {};
   bool _isLoading = false;
+  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -39,7 +43,7 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
     );
 
     if (pickedDate != null && pickedDate != _selectedDate) {
@@ -107,78 +111,109 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
           selectedDate: _selectedDate!,
           selectedTimeSlot: _selectedTimeSlot!,
           photographerId: widget.photographerId,
-          timeSlots: widget.timeSlots,
         ),
       ),
     );
   }
 
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    if (_selectedIndex == 0) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    } else if (_selectedIndex == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => HeartScreen()),
+      );
+    } else if (_selectedIndex == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => BookingsScreen()),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Booking Details")),
+      appBar: AppBar(
+        title: const Text("Booking Details"),
+        backgroundColor: Colors.blue[700],
+      ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Selected Services:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              'Selected Services:',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue[700],
+              ),
+            ),
             ...widget.selectedSubservices.map((service) => Card(
-                  margin: EdgeInsets.symmetric(vertical: 8),
+                  margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Padding(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(service['name'],
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        Text(
+                          service['name'],
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('Price: \$${service['price']}'),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.remove),
-                                  onPressed: () => setState(() {
-                                    if (_quantities[service['name']]! > 1) {
-                                      _quantities[service['name']] =
-                                          _quantities[service['name']]! - 1;
-                                    }
-                                  }),
-                                ),
-                                Text('${_quantities[service['name']]}'),
-                                IconButton(
-                                  icon: Icon(Icons.add),
-                                  onPressed: () => setState(() =>
-                                      _quantities[service['name']] =
-                                          _quantities[service['name']]! + 1),
-                                ),
-                              ],
-                            ),
+                            Text('Price: RS ${service['price']}'),
                           ],
                         ),
                       ],
                     ),
                   ),
                 )),
-            SizedBox(height: 16),
-            Text('Select Date:',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text(
+              'Select Date:',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.blue[700],
+              ),
+            ),
+            const SizedBox(height: 8),
             ElevatedButton(
               onPressed: _selectDate,
-              child: Text(_selectedDate == null
-                  ? 'Choose Date'
-                  : DateFormat('yyyy-MM-dd').format(_selectedDate!)),
+              child: Text(
+                _selectedDate == null
+                    ? 'Choose Date'
+                    : DateFormat('yyyy-MM-dd').format(_selectedDate!),
+              ),
             ),
             if (_selectedDate != null) ...[
-              SizedBox(height: 16),
-              Text('Select Time Slot:',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Text(
+                'Select Time Slot:',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                ),
+              ),
               _isLoading
-                  ? CircularProgressIndicator()
+                  ? const CircularProgressIndicator()
                   : Column(
                       children: widget.timeSlots.map((timeSlot) {
                         final startTime = timeSlot['startTime'] ?? '';
@@ -186,17 +221,26 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
                         final timeSlotString = '$startTime - $endTime';
                         final available =
                             _availableCapacities[timeSlotString] ?? 0;
+                        final isAvailable = available > 0;
+
                         return RadioListTile<String>(
                           title: Text('$timeSlotString ($available available)'),
+                          subtitle: !isAvailable
+                              ? const Text(
+                                  'Not available',
+                                  style: TextStyle(color: Colors.red),
+                                )
+                              : null,
                           value: timeSlotString,
                           groupValue: _selectedTimeSlot,
-                          onChanged: available > 0
+                          onChanged: isAvailable
                               ? (value) =>
                                   setState(() => _selectedTimeSlot = value)
                               : null,
                         );
                       }).toList(),
                     ),
+              const SizedBox(height: 16),
               Center(
                 child: ElevatedButton(
                   onPressed: _selectedTimeSlot != null &&
@@ -209,6 +253,27 @@ class _QuantityPhotographerState extends State<QuantityPhotographer> {
             ],
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        backgroundColor: Colors.blue[700],
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white70,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.favorite),
+            label: 'Heart',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
+        ],
       ),
     );
   }

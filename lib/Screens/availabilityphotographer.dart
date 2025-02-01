@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:occasioneaseuser/Screens/succesfull.dart';
 
 class AvailabilityPhotographer extends StatefulWidget {
   final List<Map<String, dynamic>> selectedServices;
@@ -9,7 +10,6 @@ class AvailabilityPhotographer extends StatefulWidget {
   final DateTime selectedDate;
   final String selectedTimeSlot;
   final String photographerId;
-  final List<Map<String, dynamic>> timeSlots;
 
   const AvailabilityPhotographer({
     Key? key,
@@ -18,7 +18,6 @@ class AvailabilityPhotographer extends StatefulWidget {
     required this.selectedDate,
     required this.selectedTimeSlot,
     required this.photographerId,
-    required this.timeSlots,
   }) : super(key: key);
 
   @override
@@ -28,7 +27,6 @@ class AvailabilityPhotographer extends StatefulWidget {
 
 class _AvailabilityPhotographerState extends State<AvailabilityPhotographer> {
   double _totalPrice = 0.0;
-  bool _isBooking = false;
 
   @override
   void initState() {
@@ -47,44 +45,19 @@ class _AvailabilityPhotographerState extends State<AvailabilityPhotographer> {
   }
 
   Future<void> _bookPhotographerService() async {
-    setState(() => _isBooking = true);
     try {
       User? user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('User not logged in');
-
-      // Recheck availability
-      final selectedDateStr =
-          DateFormat('yyyy-MM-dd').format(widget.selectedDate);
-      final bookingsQuery = await FirebaseFirestore.instance
-          .collection('PhotographerBookings')
-          .where('photographerId', isEqualTo: widget.photographerId)
-          .where('date', isEqualTo: selectedDateStr)
-          .where('timeSlot', isEqualTo: widget.selectedTimeSlot)
-          .get();
-
-      // Count existing bookings for this slot
-      final int totalBooked = bookingsQuery.size;
-
-      // Find slot capacity
-      int slotCapacity = 0;
-      for (var slot in widget.timeSlots) {
-        final slotString = '${slot['startTime']} - ${slot['endTime']}';
-        if (slotString == widget.selectedTimeSlot) {
-          slotCapacity = slot['capacity'] ?? 0;
-          break;
-        }
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User not logged in')),
+        );
+        return;
       }
 
-      // Check capacity (1 booking = 1 slot)
-      if (totalBooked >= slotCapacity) {
-        throw Exception('Slot no longer available');
-      }
-
-      // Create booking (services quantities are stored but don't affect availability)
       await FirebaseFirestore.instance.collection('PhotographerBookings').add({
         'userId': user.uid,
         'photographerId': widget.photographerId,
-        'date': selectedDateStr,
+        'date': DateFormat('yyyy-MM-dd').format(widget.selectedDate),
         'timeSlot': widget.selectedTimeSlot,
         'services': widget.selectedServices
             .map((service) => {
@@ -98,32 +71,43 @@ class _AvailabilityPhotographerState extends State<AvailabilityPhotographer> {
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Booking successful!')),
+        const SnackBar(
+            content: Text('Photographer Service Booked Successfully')),
       );
-      Navigator.pop(context);
+
+      // Navigate to Success page
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => BookingSuccessPage()),
+      );
     } catch (e) {
+      print('Error booking photographer service: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        const SnackBar(content: Text('Failed to book photographer service')),
       );
-    } finally {
-      setState(() => _isBooking = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Confirm Booking")),
+      appBar: AppBar(
+        title: const Text("Check Photographer Availability"),
+        backgroundColor: Colors.blue, // Professional blue color
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Selected Services:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            ...widget.selectedServices.map((service) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Selected Photographer Services:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ...widget.selectedServices.map((service) {
+                return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -135,40 +119,50 @@ class _AvailabilityPhotographerState extends State<AvailabilityPhotographer> {
                           style: const TextStyle(
                               fontSize: 16, fontWeight: FontWeight.bold),
                         ),
+                        const SizedBox(height: 8),
                         Text('Price: \$${service['price']}'),
                         Text('Quantity: ${widget.quantities[service['name']]}'),
                       ],
                     ),
                   ),
-                )),
-            const SizedBox(height: 16),
-            const Text(
-              'Booking Details:',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            ListTile(
-              title: const Text('Date'),
-              subtitle:
-                  Text(DateFormat('yyyy-MM-dd').format(widget.selectedDate)),
-            ),
-            ListTile(
-              title: const Text('Time Slot'),
-              subtitle: Text(widget.selectedTimeSlot),
-            ),
-            ListTile(
-              title: const Text('Total Price'),
-              subtitle: Text('\$$_totalPrice'),
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: _isBooking
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed: _bookPhotographerService,
-                      child: const Text('Confirm Booking'),
-                    ),
-            ),
-          ],
+                );
+              }).toList(),
+              const SizedBox(height: 16),
+              const Text(
+                'Selected Date:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(DateFormat('yyyy-MM-dd').format(widget.selectedDate)),
+              const SizedBox(height: 16),
+              const Text(
+                'Selected Time Slot:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(widget.selectedTimeSlot),
+              const SizedBox(height: 16),
+              const Text(
+                'Total Price:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text('\$$_totalPrice'),
+              const SizedBox(height: 16),
+              Center(
+                child: ElevatedButton(
+                  onPressed: _bookPhotographerService,
+                  child: const Text('Book Photographer Services'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 40, vertical: 15),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
