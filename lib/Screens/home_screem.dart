@@ -41,13 +41,13 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isLoadingDeals = false;
 
   final List<Map<String, String>> categories = [
-    {'name': 'Beauty Parlor', 'imageUrl': 'assets/images/beautyparlour.jpg'},
-    {'name': 'Catering', 'imageUrl': 'assets/images/catering.jpg'},
-    {'name': 'FarmHouse', 'imageUrl': 'assets/images/farmhoouse.png'},
-    {'name': 'Photographer', 'imageUrl': 'assets/images/photographer.jpg'},
-    {'name': 'Weather', 'imageUrl': 'assets/images/weather.jpg'},
-    {'name': 'Marriage Hall', 'imageUrl': 'assets/images/banquet.jpg'},
-    {'name': 'Saloon', 'imageUrl': 'assets/images/saloon.png'},
+    {'name': 'Beauty Parlor', 'imageUrl': 'assets/images/parlor.jpeg'},
+    {'name': 'Catering', 'imageUrl': 'assets/images/caterings.jpeg'},
+    {'name': 'FarmHouse', 'imageUrl': 'assets/images/farm.jpeg'},
+    {'name': 'Photographer', 'imageUrl': 'assets/images/photo.jpeg'},
+    {'name': 'Weather', 'imageUrl': 'assets/images/weath.jpeg'},
+    {'name': 'Marriage Hall', 'imageUrl': 'assets/images/hall.jpeg'},
+    {'name': 'Saloon', 'imageUrl': 'assets/images/mens_salon.jpeg'},
     {'name': 'Custom', 'imageUrl': 'assets/images/custom.png'},
   ];
 
@@ -347,12 +347,20 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
               icon: Icon(Icons.favorite), label: "Favorites"),
           BottomNavigationBarItem(
-              icon: Icon(Icons.settings), label: "Settings"),
+            icon: Icon(Icons.book),
+            label: 'Bookings',
+          ),
         ],
         onTap: (index) {
           if (index == 1) {
             Navigator.push(context,
                 MaterialPageRoute(builder: (context) => const HeartScreen()));
+          }
+          if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => BookingsScreen()),
+            );
           }
         },
       ),
